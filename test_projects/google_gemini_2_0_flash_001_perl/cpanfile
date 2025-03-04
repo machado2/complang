@@ -1,0 +1,8 @@
+
+requires 'Mojolicious::Lite';
+requires 'DBI';
+requires 'JSON';
+requires 'Data::Dumper';
+requires 'Encode';
+requires 'Encode::Detect';
+requires 'DBD::Pg';

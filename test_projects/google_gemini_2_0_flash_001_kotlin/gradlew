@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+export GRADLE_USER_HOME="${GRADLE_USER_HOME:-${HOME}/.gradle}"
+export JAVA_HOME="${JAVA_HOME:-$(/usr/libexec/java_home)}"
+./gradle "$@"

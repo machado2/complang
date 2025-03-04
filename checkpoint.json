@@ -1,0 +1,175 @@
+{
+  "completed": [
+    "google/gemini-2.0-flash-001|TypeScript",
+    "google/gemini-2.0-flash-001|Rust",
+    "google/gemini-2.0-flash-001|Haskell",
+    "google/gemini-2.0-flash-001|Ruby",
+    "google/gemini-2.0-flash-001|C#",
+    "google/gemini-2.0-flash-001|Zig",
+    "google/gemini-2.0-flash-001|Scala",
+    "google/gemini-2.0-flash-001|Java",
+    "google/gemini-2.0-flash-001|Go",
+    "google/gemini-2.0-flash-001|PHP",
+    "google/gemini-2.0-flash-001|Perl",
+    "google/gemini-2.0-flash-001|Python",
+    "google/gemini-2.0-flash-001|Kotlin",
+    "google/gemini-2.0-flash-001|C++",
+    "google/gemini-2.0-flash-001|JavaScript"
+  ],
+  "results": [
+    {
+      "llm": "google/gemini-2.0-flash-001",
+      "stack": "Python",
+      "success": true,
+      "steps": 16,
+      "duration": 234.6409146785736,
+      "directory": "./test_projects\\google_gemini_2_0_flash_001_python",
+      "feedback": "Success",
+      "input_tokens": 252558,
+      "output_tokens": 25261
+    },
+    {
+      "llm": "google/gemini-2.0-flash-001",
+      "stack": "Java",
+      "success": false,
+      "steps": 36,
+      "duration": 437.797043800354,
+      "directory": "./test_projects\\google_gemini_2_0_flash_001_java",
+      "feedback": "The tests failed because the `target/` directory was not created by the Maven build within the Docker container, resulting in an `lstat` error when attempting to copy the JAR file.",
+      "input_tokens": 1409175,
+      "output_tokens": 26179
+    },
+    {
+      "llm": "google/gemini-2.0-flash-001",
+      "stack": "Go",
+      "success": false,
+      "steps": 46,
+      "duration": 567.7589681148529,
+      "directory": "./test_projects\\google_gemini_2_0_flash_001_go",
+      "feedback": "I was unable to complete this task due to issues with go modules dependency management in docker, and difficulties in getting the toolchain's file writing to work as intended",
+      "input_tokens": 3891212,
+      "output_tokens": 84276
+    },
+    {
+      "llm": "google/gemini-2.0-flash-001",
+      "stack": "JavaScript",
+      "success": true,
+      "steps": 24,
+      "duration": 355.2610504627228,
+      "directory": "./test_projects\\google_gemini_2_0_flash_001_javascript",
+      "feedback": "Success",
+      "input_tokens": 1171291,
+      "output_tokens": 33089
+    },
+    {
+      "llm": "google/gemini-2.0-flash-001",
+      "stack": "C#",
+      "success": true,
+      "steps": 5,
+      "duration": 40.47119140625,
+      "directory": "./test_projects\\google_gemini_2_0_flash_001_c_x",
+      "feedback": "Success",
+      "input_tokens": 16804,
+      "output_tokens": 2007
+    },
+    {
+      "llm": "google/gemini-2.0-flash-001",
+      "stack": "PHP",
+      "success": true,
+      "steps": 8,
+      "duration": 262.9592852592468,
+      "directory": "./test_projects\\google_gemini_2_0_flash_001_php",
+      "feedback": "Success",
+      "input_tokens": 113745,
+      "output_tokens": 8699
+    },
+    {
+      "llm": "google/gemini-2.0-flash-001",
+      "stack": "Rust",
+      "success": false,
+      "steps": 35,
+      "duration": 2435.0155980587006,
+      "directory": "./test_projects\\google_gemini_2_0_flash_001_rust",
+      "feedback": "The test failed because the Rust application within the Docker container could not establish a network connection with the PostgreSQL database, resulting in a \"Connection refused\" error. This indicates a configuration issue in the docker image or external to it.",
+      "input_tokens": 2516129,
+      "output_tokens": 58268
+    },
+    {
+      "llm": "google/gemini-2.0-flash-001",
+      "stack": "TypeScript",
+      "success": true,
+      "steps": 19,
+      "duration": 342.02353262901306,
+      "directory": "./test_projects\\google_gemini_2_0_flash_001_typescript",
+      "feedback": "Success",
+      "input_tokens": 615025,
+      "output_tokens": 47512
+    },
+    {
+      "llm": "google/gemini-2.0-flash-001",
+      "stack": "Kotlin",
+      "success": false,
+      "steps": 36,
+      "duration": 739.7930645942688,
+      "directory": "./test_projects\\google_gemini_2_0_flash_001_kotlin",
+      "feedback": "The test failed because the gradlew script within the Docker container couldn't find the `gradle` executable.",
+      "input_tokens": 1818956,
+      "output_tokens": 74614
+    },
+    {
+      "llm": "google/gemini-2.0-flash-001",
+      "stack": "Ruby",
+      "success": true,
+      "steps": 19,
+      "duration": 337.27200841903687,
+      "directory": "./test_projects\\google_gemini_2_0_flash_001_ruby",
+      "feedback": "Success",
+      "input_tokens": 397350,
+      "output_tokens": 17782
+    },
+    {
+      "llm": "google/gemini-2.0-flash-001",
+      "stack": "Scala",
+      "success": false,
+      "steps": 35,
+      "duration": 1157.3983161449432,
+      "directory": "./test_projects\\google_gemini_2_0_flash_001_scala",
+      "feedback": "The tests failed because the application.conf file contained carriage return characters which caused a parsing error. This can occur when copying files between operating systems with different line ending conventions (Windows uses CRLF whereas Linux and MacOS use LF). Additionally, the environment variable might not have been properly set. The API tests also timed out.",
+      "input_tokens": 1737689,
+      "output_tokens": 52113
+    },
+    {
+      "llm": "google/gemini-2.0-flash-001",
+      "stack": "Zig",
+      "success": false,
+      "steps": 35,
+      "duration": 134.54250264167786,
+      "directory": "./test_projects\\google_gemini_2_0_flash_001_zig",
+      "feedback": "The test failed because the Docker image build process could not find a suitable base image or method to install Zig, resulting in a 'not found' error.",
+      "input_tokens": 438770,
+      "output_tokens": 8847
+    },
+    {
+      "llm": "google/gemini-2.0-flash-001",
+      "stack": "Haskell",
+      "success": false,
+      "steps": 36,
+      "duration": 3227.7254984378815,
+      "directory": "./test_projects\\google_gemini_2_0_flash_001_haskell",
+      "feedback": "Previous attempts failed primarily due to syntax errors in the generated Haskell code, specifically related to SQL queries, error messages, language extensions, and Docker build configurations.",
+      "input_tokens": 2097137,
+      "output_tokens": 44225
+    },
+    {
+      "llm": "google/gemini-2.0-flash-001",
+      "stack": "Perl",
+      "success": true,
+      "steps": 22,
+      "duration": 338.02336144447327,
+      "directory": "./test_projects\\google_gemini_2_0_flash_001_perl",
+      "feedback": "Success",
+      "input_tokens": 638969,
+      "output_tokens": 35481
+    }
+  ]
+}
