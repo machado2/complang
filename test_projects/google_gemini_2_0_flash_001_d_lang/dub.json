@@ -1,0 +1,23 @@
+{
+	"name": "crud_api",
+	"description": "A simple CRUD API with D",
+	"authors": [
+		"You"
+	],
+	"copyright": "Copyright © 2024, You",
+	"license": "proprietary",
+	"dependencySpec": ">=1.0.0",
+	"dependencies": {
+		"vibe-d": "~>0.9.9",
+		"postgresql": "~>0.8.0"
+	},
+	"configurations": [
+		{
+			"name": "default",
+			"targetType": "executable"
+		}
+	],
+	"sourcePaths": [
+		"source"
+	]
+}

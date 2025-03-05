@@ -1,20 +1,27 @@
 {
   "completed": [
-    "google/gemini-2.0-flash-001|TypeScript",
     "google/gemini-2.0-flash-001|Rust",
+    "google/gemini-2.0-flash-001|OCAML",
+    "google/gemini-2.0-flash-001|Kotlin",
+    "google/gemini-2.0-flash-001|Clojure",
     "google/gemini-2.0-flash-001|Haskell",
-    "google/gemini-2.0-flash-001|Ruby",
-    "google/gemini-2.0-flash-001|C#",
     "google/gemini-2.0-flash-001|Zig",
-    "google/gemini-2.0-flash-001|Scala",
-    "google/gemini-2.0-flash-001|Java",
-    "google/gemini-2.0-flash-001|Go",
+    "google/gemini-2.0-flash-001|Elixir",
     "google/gemini-2.0-flash-001|PHP",
     "google/gemini-2.0-flash-001|Perl",
+    "google/gemini-2.0-flash-001|Raku",
+    "google/gemini-2.0-flash-001|Go",
+    "google/gemini-2.0-flash-001|D lang",
+    "google/gemini-2.0-flash-001|Common Lisp",
+    "google/gemini-2.0-flash-001|Java",
+    "deepseek/deepseek-r1:free|Python",
     "google/gemini-2.0-flash-001|Python",
-    "google/gemini-2.0-flash-001|Kotlin",
-    "google/gemini-2.0-flash-001|C++",
-    "google/gemini-2.0-flash-001|JavaScript"
+    "google/gemini-2.0-flash-001|Ruby",
+    "google/gemini-2.0-flash-001|Scala",
+    "google/gemini-2.0-flash-001|C#",
+    "google/gemini-2.0-flash-001|JavaScript",
+    "google/gemini-2.0-flash-001|TypeScript",
+    "google/gemini-2.0-flash-001|C++"
   ],
   "results": [
     {
@@ -170,6 +177,85 @@
       "feedback": "Success",
       "input_tokens": 638969,
       "output_tokens": 35481
+    },
+    {
+      "llm": "google/gemini-2.0-flash-001",
+      "stack": "Raku",
+      "success": false,
+      "steps": 30,
+      "duration": 2908.6318690776825,
+      "directory": "./test_projects\\google_gemini_2_0_flash_001_raku",
+      "feedback": "The Raku application failed to connect to the PostgreSQL database, preventing the CRUD API from functioning.",
+      "input_tokens": 2445140,
+      "output_tokens": 78091
+    },
+    {
+      "llm": "google/gemini-2.0-flash-001",
+      "stack": "Clojure",
+      "success": false,
+      "steps": 35,
+      "duration": 682.263683795929,
+      "directory": "./test_projects\\google_gemini_2_0_flash_001_clojure",
+      "feedback": {
+        "answer": "The application failed due to an IllegalStateException indicating that the 'app-routes' function could not be found, likely caused by incorrect macro variable resolution."
+      },
+      "input_tokens": 2226404,
+      "output_tokens": 59320
+    },
+    {
+      "llm": "google/gemini-2.0-flash-001",
+      "stack": "Common Lisp",
+      "success": false,
+      "steps": 37,
+      "duration": 763.7573871612549,
+      "directory": "./test_projects\\google_gemini_2_0_flash_001_common_lisp",
+      "feedback": "The tests consistently timed out due to container networking issues, preventing API calls from reaching the server. Quicklisp setup and server startup were confirmed in logs, yet external access was blocked.",
+      "input_tokens": 2334101,
+      "output_tokens": 47723
+    },
+    {
+      "llm": "google/gemini-2.0-flash-001",
+      "stack": "OCAML",
+      "success": false,
+      "steps": 35,
+      "duration": 1572.7582564353943,
+      "directory": "./test_projects\\google_gemini_2_0_flash_001_ocaml",
+      "feedback": "The test failed because the type signature for the `Postgresql.connection` constructor in `main.ml` expected `port` as a string, but it was provided as an integer.",
+      "input_tokens": 2552175,
+      "output_tokens": 66914
+    },
+    {
+      "llm": "google/gemini-2.0-flash-001",
+      "stack": "D lang",
+      "success": false,
+      "steps": 37,
+      "duration": 822.0202422142029,
+      "directory": "./test_projects\\google_gemini_2_0_flash_001_d_lang",
+      "feedback": "The test failed because the Docker build process couldn't add the D language repository. Specifically, the command `apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F3F896F3274BBD9BBBA59058710592E7FB7AF6CA` failed to retrieve the repository key, resulting in the error 'gpg: keyserver receive failed: No data'. This prevented `apt-get update` from properly recognizing the PPA, making it impossible to subsequently install `dmd` and `dub`.",
+      "input_tokens": 2915475,
+      "output_tokens": 67721
+    },
+    {
+      "llm": "google/gemini-2.0-flash-001",
+      "stack": "Elixir",
+      "success": false,
+      "steps": 36,
+      "duration": 357.591317653656,
+      "directory": "./test_projects\\google_gemini_2_0_flash_001_elixir",
+      "feedback": "The test failed because the setup_db.sh script could not be found during the Docker build process. This likely indicates an issue with file paths or permissions within the Dockerfile.",
+      "input_tokens": 1126642,
+      "output_tokens": 35140
+    },
+    {
+      "llm": "deepseek/deepseek-r1:free",
+      "stack": "Python",
+      "success": false,
+      "steps": 65,
+      "duration": 2733.5817136764526,
+      "directory": "./test_projects\\deepseek_deepseek_r1_free_python",
+      "feedback": "\u041f\u043e\u0445\u043e\u0436\u0435, \u0432 \u0432\u0430\u0448\u0435\u043c \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0438 \u043f\u0440\u043e\u0438\u0437\u043e\u0448\u043b\u0430 \u043e\u0448\u0438\u0431\u043a\u0430: \u0432\u043c\u0435\u0441\u0442\u043e \u043e\u0436\u0438\u0434\u0430\u0435\u043c\u043e\u0433\u043e \u0442\u0435\u043a\u0441\u0442\u0430 \u043e\u0442\u043e\u0431\u0440\u0430\u0436\u0430\u044e\u0442\u0441\u044f \u0442\u0435\u0445\u043d\u0438\u0447\u0435\u0441\u043a\u0438\u0435 \u043c\u0435\u0442\u043a\u0438 `[object Object]`. \u041e\u0431\u044b\u0447\u043d\u043e \u044d\u0442\u043e \u043f\u0440\u043e\u0438\u0441\u0445\u043e\u0434\u0438\u0442, \u043a\u043e\u0433\u0434\u0430:\n\n1. **\u0414\u0430\u043d\u043d\u044b\u0435 \u043f\u0435\u0440\u0435\u0434\u0430\u044e\u0442\u0441\u044f \u0432 \u043d\u0435\u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u043e\u043c \u0444\u043e\u0440\u043c\u0430\u0442\u0435**  \n   \u041d\u0430\u043f\u0440\u0438\u043c\u0435\u0440, \u0435\u0441\u043b\u0438 \u0432\u044b \u043f\u044b\u0442\u0430\u0435\u0442\u0435\u0441\u044c \u0432\u044b\u0432\u0435\u0441\u0442\u0438 \u043e\u0431\u044a\u0435\u043a\u0442 JavaScript \u043d\u0430\u043f\u0440\u044f\u043c\u0443\u044e, \u0432\u043c\u0435\u0441\u0442\u043e \u044d\u0442\u043e\u0433\u043e \u043e\u0442\u043e\u0431\u0440\u0430\u0436\u0430\u0435\u0442\u0441\u044f `[object Object]`.  \n   **\u0420\u0435\u0448\u0435\u043d\u0438\u0435:** \u0418\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0439\u0442\u0435 `JSON.stringify(obj)` \u0434\u043b\u044f \u043f\u0440\u0435\u043e\u0431\u0440\u0430\u0437\u043e\u0432\u0430\u043d\u0438\u044f \u043e\u0431\u044a\u0435\u043a\u0442\u0430 \u0432 \u0441\u0442\u0440\u043e\u043a\u0443.\n\n   ```javascript\n   const data = { name: \"Alice\", age: 25 };\n   console.log(JSON.stringify(data)); // {\"name\":\"Alice\",\"age\":25}\n   ```\n\n2. **\u041e\u0448\u0438\u0431\u043a\u0430 \u0432 API \u0438\u043b\u0438 \u043e\u0431\u0440\u0430\u0431\u043e\u0442\u043a\u0435 \u0434\u0430\u043d\u043d\u044b\u0445**  \n   \u0415\u0441\u043b\u0438 \u0434\u0430\u043d\u043d\u044b\u0435 \u043f\u0440\u0438\u0445\u043e\u0434\u044f\u0442 \u043e\u0442 \u0441\u0435\u0440\u0432\u0435\u0440\u0430 \u0438\u043b\u0438 \u0434\u0440\u0443\u0433\u043e\u0433\u043e \u0438\u0441\u0442\u043e\u0447\u043d\u0438\u043a\u0430, \u0443\u0431\u0435\u0434\u0438\u0442\u0435\u0441\u044c, \u0447\u0442\u043e \u043e\u043d\u0438 \u0434\u0435\u043a\u043e\u0434\u0438\u0440\u0443\u044e\u0442\u0441\u044f \u043f\u0440\u0430\u0432\u0438\u043b\u044c\u043d\u043e.  \n   **\u041f\u0440\u0438\u043c\u0435\u0440:** \u041f\u043e\u043b\u0443\u0447\u0435\u043d\u0438\u0435 JSON-\u043e\u0442\u0432\u0435\u0442\u0430 \u043e\u0442 \u0441\u0435\u0440\u0432\u0435\u0440\u0430 \u0438 \u0435\u0433\u043e \u043f\u0430\u0440\u0441\u0438\u043d\u0433:\n   ```javascript\n   fetch('https://api.example.com/data')\n     .then(response => response.json()) // \u0434\u0435\u043a\u043e\u0434\u0438\u0440\u0443\u0435\u043c JSON\n     .then(data => console.log(data));\n   ```\n\n3. **\u041f\u0440\u043e\u0431\u043b\u0435\u043c\u0430 \u0441 \u043e\u0442\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435\u043c \u0432 \u0438\u043d\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0435**  \n   \u0412 React/Vue/\u0434\u0440\u0443\u0433\u0438\u0445 \u0444\u0440\u0435\u0439\u043c\u0432\u043e\u0440\u043a\u0430\u0445 \u043e\u0431\u044a\u0435\u043a\u0442\u044b \u043d\u0435\u043b\u044c\u0437\u044f \u0432\u044b\u0432\u043e\u0434\u0438\u0442\u044c \u043d\u0430\u043f\u0440\u044f\u043c\u0443\u044e.  \n   **\u0420\u0435\u0448\u0435\u043d\u0438\u0435:** \u0414\u043e\u0441\u0442\u0430\u043d\u044c\u0442\u0435 \u043a\u043e\u043d\u043a\u0440\u0435\u0442\u043d\u044b\u0435 \u043f\u043e\u043b\u044f \u043e\u0431\u044a\u0435\u043a\u0442\u0430:\n   ```jsx\n   function UserInfo({ user }) {\n     return <div>{user.name}</div>; // \u0432\u043c\u0435\u0441\u0442\u043e {user}\n   }\n   ```\n\n\u0415\u0441\u043b\u0438 \u043f\u0440\u043e\u0431\u043b\u0435\u043c\u0430 \u043d\u0435 \u0438\u0441\u0447\u0435\u0437\u043b\u0430, \u0443\u0442\u043e\u0447\u043d\u0438\u0442\u0435:\n- \u0412 \u043a\u0430\u043a\u043e\u043c \u043a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u0435 \u0432\u043e\u0437\u043d\u0438\u043a\u0430\u0435\u0442 \u043e\u0448\u0438\u0431\u043a\u0430 (\u0431\u0440\u0430\u0443\u0437\u0435\u0440, Node.js, \u0444\u0440\u0435\u0439\u043c\u0432\u043e\u0440\u043a)?\n- \u041a\u0430\u043a\u043e\u0439 \u043a\u043e\u0434 \u0432\u044b\u0437\u044b\u0432\u0430\u0435\u0442 \u044d\u0442\u0443 \u043f\u0440\u043e\u0431\u043b\u0435\u043c\u0443?\n- \u0427\u0442\u043e \u0438\u043c\u0435\u043d\u043d\u043e \u0432\u044b \u043f\u044b\u0442\u0430\u0435\u0442\u0435\u0441\u044c \u0441\u0434\u0435\u043b\u0430\u0442\u044c?",
+      "input_tokens": 30492,
+      "output_tokens": 50744
     }
   ]
 }

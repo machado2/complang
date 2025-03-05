@@ -18,7 +18,7 @@ from runcommand import check_docker, stop_and_remove_docker, build_and_run_docke
 # LLMS = ["qwen/qwen-2.5-coder-32b-instruct"]
 LLMS = ["google/gemini-2.0-flash-001", "deepseek/deepseek-r1:free", "qwen/qwen-2.5-coder-32b-instruct", "google/gemini-2.0-pro-exp-02-05:free", "openai/gpt-4o-mini", "meta-llama/llama-3.3-70b-instruct", "deepseek/deepseek-r1-distill-llama-70b"]
 # LLMS = ["openai/gpt-4o"]
-STACKS = ["Python", "Java", "Go", "JavaScript", "C++", "C#", "PHP", "TypeScript", "Kotlin", "Ruby", "Scala", "Zig", "Haskell", "Perl", "Raku", "Clojure", "Common Lisp", "OCAML", "D lang", "Elixir"]
+STACKS = ["Python", "Java", "Go", "JavaScript", "C++", "C#", "PHP", "Rust", "TypeScript", "Kotlin", "Ruby", "Scala", "Zig", "Haskell", "Perl", "Raku", "Clojure", "Common Lisp", "OCAML", "D lang", "Elixir"]
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 PGPASSWORD = get_pg_password()
 BASE_DIR = "./test_projects"
@@ -390,10 +390,10 @@ def generate_report(results: List[Dict[str, Any]]):
         f.write("# Test Report\n\n")
         f.write(f"Generated on: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
         f.write("## Results\n\n")
-        headers = ["LLM", "Stack", "Status", "Steps", "Time (s)", "Input Tokens", "Output Tokens", "Directory"]
+        headers = ["LLM", "Stack", "Status", "Steps", "Time (s)", "Input Tokens", "Output Tokens"]
         table = [
             [r["llm"], r["stack"], "✅ Success" if r["success"] else "❌ Failure", 
-             r["steps"], f"{r['duration']:.2f}", r["input_tokens"], r["output_tokens"], r["directory"]]
+             r["steps"], f"{r['duration']:.2f}", r["input_tokens"], r["output_tokens"]]
             for r in results
         ]
         f.write(tabulate(table, headers, tablefmt="github"))

@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y \
 
 RUN apt-get install -y libjson-xs-perl
 
-RUN zef install JSON::Fast DBIish Cro::HTTP::Router Cro::HTTP::Server
+RUN zef install --force-test JSON::Fast DBIish Cro::HTTP::Router Cro::HTTP::Server Env
 
 WORKDIR /app
 

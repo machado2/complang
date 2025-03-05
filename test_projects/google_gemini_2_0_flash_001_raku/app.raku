@@ -7,14 +7,14 @@ use Env;
 
 # Database configuration
 my $host     = 'host.docker.internal';
-my $port     = 5432;
+my $db_port  = 5432;
 my $database = 'test_google_gemini_2_0_flash_001_raku';
 my $user     = 'postgres';
-my $password = env('PGPASSWORD') // ''; # Get password from environment variable
-my $dsn      = "dbi:Pg:database=$database;host=$host;port=$port";
+my $password = $*ENV<PGPASSWORD> // ''; # Get password from environment variable
+my $dsn      = "dbi:Pg:database=$database;host=$host;port=$db_port";
 
 # Database connection
-my $dbh = DBIish.connect: $dsn, $user, $password, { RaiseError => 1 };
+my $dbh = DBIish.connect: 'Pg', dsn => $dsn, RaiseError => 1;
 
 # Check if the users table exists; create it if not
 sub create_users_table() {
@@ -76,7 +76,7 @@ $router.route: '/users/{id}',
             $ctx.response.content-type = 'application/json';
         } else {
             $ctx.response.status = 404;
-            $ctx.response.body = to-json({ message => "User not found" }); # Correct the status code
+            $ctx.response.body = to-json({ message => "User not found" });
             $ctx.response.content-type = 'application/json';
         }
     };
@@ -92,7 +92,7 @@ $router.route: '/users/{id}',
 
         my $sth = $dbh.prepare("UPDATE users SET name = ?, email = ? WHERE id = ?");
         $sth.execute($name, $email, $id);
-        if $dbh.rows {
+        if $sth.rows {
             $ctx.response.status = 204;
         } else {
             $ctx.response.status = 404;
@@ -107,7 +107,7 @@ $router.route: '/users/{id}',
         my $id = $ctx.route_params<id>;
         my $sth = $dbh.prepare("DELETE FROM users WHERE id = ?");
         $sth.execute($id);
-        if $dbh.rows {
+        if $sth.rows {
             $ctx.response.status = 204;
         } else {
             $ctx.response.status = 404;
@@ -117,10 +117,10 @@ $router.route: '/users/{id}',
     };
 
 # Start the server
-my $port = 8080;
+my $http_port = 8080;
 Cro::HTTP::Server.new(
     http => <1.1>,
     host => '0.0.0.0',
-    port => $port,
+    port => $http_port,
     router => $router
 ).start;
