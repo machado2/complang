@@ -1,14 +1,18 @@
 {
   "completed": [
-    "openai/gpt-4o-mini|Python",
-    "openai/gpt-4o-mini|Java",
-    "qwen/qwen-2.5-coder-32b-instruct|Java",
+    "deepseek/deepseek-r1-distill-llama-70b|Python",
     "google/gemini-2.0-flash-001|Python",
     "openai/gpt-4o-mini|JavaScript",
     "google/gemini-2.0-flash-001|JavaScript",
+    "qwen/qwen-2.5-coder-32b-instruct|Python",
+    "meta-llama/llama-3.3-70b-instruct|Java",
+    "meta-llama/llama-3.3-70b-instruct|JavaScript",
     "google/gemini-2.0-flash-001|Java",
     "qwen/qwen-2.5-coder-32b-instruct|JavaScript",
-    "qwen/qwen-2.5-coder-32b-instruct|Python"
+    "meta-llama/llama-3.3-70b-instruct|Python",
+    "qwen/qwen-2.5-coder-32b-instruct|Java",
+    "openai/gpt-4o-mini|Python",
+    "openai/gpt-4o-mini|Java"
   ],
   "results": [
     {
@@ -109,6 +113,50 @@
       "feedback": "Based on your request, here's a comprehensive approach to create a CRUD API using JavaScript (Node.js) that connects to a PostgreSQL database and includes all the mentioned functionalities and operations.\n\n### Step 1: Set Up Project Structure\n1. Create a new directory for your project.\n2. Initialize a new Node.js application.\n3. Install necessary packages.\n\n```bash\nmkdir node-postgres-crud\ncd node-postgres-crud\nnpm init -y\nnpm install express pg\n```\n\n### Step 2: Create the Express API Code\nCreate a file named `app.js` and add the following code:\n\n```javascript\n// app.js\nconst express = require('express');\nconst { Pool } = require('pg');\nconst app = express();\nconst PORT = 8080;\n\n// Middleware to parse JSON bodies\napp.use(express.json());\n\n// PostgreSQL connection setup\nconst pool = new Pool({\n    host: 'host.docker.internal',\n    port: 5432,\n    database: 'test_openai_gpt_4o_mini_javascript',\n    user: 'postgres',\n    password: process.env.PGPASSWORD,\n});\n\n// Create users table if it doesn't exist\npool.query('CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE);')\n    .then(() => console.log('Users table created or already exists.'))\n    .catch(err => console.error('Error creating table:', err));\n\n// Create a new user\napp.post('/users', async (req, res) => {\n    const { name, email } = req.body;\n    try {\n        const result = await pool.query('INSERT INTO users (name, email) VALUES ($1, $2) RETURNING *;', [name, email]);\n        res.status(201).json(result.rows[0]);\n    } catch (err) {\n        console.error(err);\n        res.status(500).send('Error creating user');\n    }\n});\n\n// Get all users\napp.get('/users', async (req, res) => {\n    try {\n        const result = await pool.query('SELECT * FROM users;');\n        res.status(200).json(result.rows);\n    } catch (err) {\n        console.error(err);\n        res.status(500).send('Error retrieving users');\n    }\n});\n\n// Get user by ID\napp.get('/users/:id', async (req, res) => {\n    const { id } = req.params;\n    try {\n        const result = await pool.query('SELECT * FROM users WHERE id = $1;', [id]);\n        if (result.rowCount > 0) {\n            res.status(200).json(result.rows[0]);\n        } else {\n            res.status(404).send('User not found');\n        }\n    } catch (err) {\n        console.error(err);\n        res.status(500).send('Error retrieving user');\n    }\n});\n\n// Update a user\napp.put('/users/:id', async (req, res) => {\n    const { id } = req.params;\n    const { name, email } = req.body;\n    try {\n        const result = await pool.query('UPDATE users SET name = $1, email = $2 WHERE id = $3;', [name, email, id]);\n        if (result.rowCount > 0) {\n            res.status(200).send('User updated');\n        } else {\n            res.status(404).send('User not found');\n        }\n    } catch (err) {\n        console.error(err);\n        res.status(500).send('Error updating user');\n    }\n});\n\n// Delete a user\napp.delete('/users/:id', async (req, res) => {\n    const { id } = req.params;\n    try {\n        const result = await pool.query('DELETE FROM users WHERE id = $1;', [id]);\n        if (result.rowCount > 0) {\n            res.status(200).send('User deleted');\n        } else {\n            res.status(404).send('User not found');\n        }\n    } catch (err) {\n        console.error(err);\n        res.status(500).send('Error deleting user');\n    }\n});\n\n// Start the server\napp.listen(PORT, () => {\n    console.log('Server is running on port ' + PORT);\n});\n```\n\n### Step 3: Create a Dockerfile\nCreate a `Dockerfile` in the same directory with the following content:\n\n```dockerfile\n# Use the official Node.js image\nFROM node:14\n\n# Set the working directory\nWORKDIR /usr/src/app\n\n# Copy package.json and package-lock.json\nCOPY package*.json ./\n\n# Install dependencies\nRUN npm install\n\n# Copy the rest of the application source\nCOPY . .\n\n# Expose the API port\nEXPOSE 8080\n\n# Command to run the application\nCMD [\"node\", \"app.js\"]\n```\n\n### Step 4: Run the Application\nYou can build and run your application using Docker:\n\n1. Build the Docker image:\n   ```bash\n   docker build -t node-postgres-crud .\n   ```\n\n2. Run the container (ensure that your PostgreSQL is accessible from the Docker container):\n   ```bash\n   docker run -e PGPASSWORD=yourpassword -p 8080:8080 node-postgres-crud\n   ```\n\n### Testing the API\nNow you can test the API using Postman or any other API client.\n\n**Endpoints:**\n- `POST /users`: Create a user with JSON body `{ \"name\": \"string\", \"email\": \"string\" }`.\n- `GET /users`: Get all users.\n- `GET /users/{id}`: Get a user by their id.\n- `PUT /users/{id}`: Update a user with JSON body `{ \"name\": \"string\", \"email\": \"string\" }`.\n- `DELETE /users/{id}`: Delete a user by their id.\n\n### Testing the API with HTTP Requests\nYou can use tools like Postman or CURL to send requests to your API.\n\nThis full implementation should avoid previous issues and meet all the specified requirements. If you need more help, feel free to ask!",
       "input_tokens": 890601,
       "output_tokens": 26641
+    },
+    {
+      "llm": "meta-llama/llama-3.3-70b-instruct",
+      "stack": "Python",
+      "success": true,
+      "steps": 11,
+      "duration": 315.44845700263977,
+      "directory": "./test_projects\\meta_llama_llama_3_3_70b_instruct_python",
+      "feedback": "Success",
+      "input_tokens": 81883,
+      "output_tokens": 3997
+    },
+    {
+      "llm": "meta-llama/llama-3.3-70b-instruct",
+      "stack": "Java",
+      "success": false,
+      "steps": 11,
+      "duration": 651.5769879817963,
+      "directory": "./test_projects\\meta_llama_llama_3_3_70b_instruct_java",
+      "feedback": "Failed to create a CRUD API using Java",
+      "input_tokens": 72838,
+      "output_tokens": 4545
+    },
+    {
+      "llm": "meta-llama/llama-3.3-70b-instruct",
+      "stack": "JavaScript",
+      "success": false,
+      "steps": 12,
+      "duration": 249.92183303833008,
+      "directory": "./test_projects\\meta_llama_llama_3_3_70b_instruct_javascript",
+      "feedback": "An error occurred while connecting to the database.",
+      "input_tokens": 77789,
+      "output_tokens": 3637
+    },
+    {
+      "llm": "deepseek/deepseek-r1-distill-llama-70b",
+      "stack": "Python",
+      "success": false,
+      "steps": 33,
+      "duration": 511.71645402908325,
+      "directory": "./test_projects\\deepseek_deepseek_r1_distill_llama_70b_python",
+      "feedback": "",
+      "input_tokens": 6102,
+      "output_tokens": 11905
     }
   ]
 }

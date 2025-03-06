@@ -1,20 +1,24 @@
 # Test Report
 
-Generated on: 2025-03-05 23:52:57
+Generated on: 2025-03-06 08:01:59
 
 ## Results
 
-| LLM                              | Stack      | Status     |   Steps |   Time (s) |   Input Tokens |   Output Tokens |
-|----------------------------------|------------|------------|---------|------------|----------------|-----------------|
-| google/gemini-2.0-flash-001      | Python     | ✅ Success |       7 |      51.54 |          28570 |            3314 |
-| google/gemini-2.0-flash-001      | Java       | ✅ Success |      25 |     193.3  |         392487 |           10502 |
-| google/gemini-2.0-flash-001      | JavaScript | ✅ Success |       7 |      35.21 |          28261 |            2525 |
-| qwen/qwen-2.5-coder-32b-instruct | Python     | ✅ Success |      13 |     320.42 |          85119 |            4422 |
-| qwen/qwen-2.5-coder-32b-instruct | Java       | ❌ Failure |      65 |    3451.84 |        5373995 |          118796 |
-| qwen/qwen-2.5-coder-32b-instruct | JavaScript | ✅ Success |       5 |      46.92 |          13876 |            1393 |
-| openai/gpt-4o-mini               | Python     | ✅ Success |      12 |     126.1  |          67112 |            4920 |
-| openai/gpt-4o-mini               | Java       | ❌ Failure |      65 |     855.48 |        4746955 |           88302 |
-| openai/gpt-4o-mini               | JavaScript | ❌ Failure |      33 |     307.59 |         890601 |           26641 |
+| LLM                                    | Stack      | Status     |   Steps |   Time (s) |   Input Tokens |   Output Tokens |
+|----------------------------------------|------------|------------|---------|------------|----------------|-----------------|
+| google/gemini-2.0-flash-001            | Python     | ✅ Success |       7 |      51.54 |          28570 |            3314 |
+| google/gemini-2.0-flash-001            | Java       | ✅ Success |      25 |     193.3  |         392487 |           10502 |
+| google/gemini-2.0-flash-001            | JavaScript | ✅ Success |       7 |      35.21 |          28261 |            2525 |
+| qwen/qwen-2.5-coder-32b-instruct       | Python     | ✅ Success |      13 |     320.42 |          85119 |            4422 |
+| qwen/qwen-2.5-coder-32b-instruct       | Java       | ❌ Failure |      65 |    3451.84 |        5373995 |          118796 |
+| qwen/qwen-2.5-coder-32b-instruct       | JavaScript | ✅ Success |       5 |      46.92 |          13876 |            1393 |
+| openai/gpt-4o-mini                     | Python     | ✅ Success |      12 |     126.1  |          67112 |            4920 |
+| openai/gpt-4o-mini                     | Java       | ❌ Failure |      65 |     855.48 |        4746955 |           88302 |
+| openai/gpt-4o-mini                     | JavaScript | ❌ Failure |      33 |     307.59 |         890601 |           26641 |
+| meta-llama/llama-3.3-70b-instruct      | Python     | ✅ Success |      11 |     315.45 |          81883 |            3997 |
+| meta-llama/llama-3.3-70b-instruct      | Java       | ❌ Failure |      11 |     651.58 |          72838 |            4545 |
+| meta-llama/llama-3.3-70b-instruct      | JavaScript | ❌ Failure |      12 |     249.92 |          77789 |            3637 |
+| deepseek/deepseek-r1-distill-llama-70b | Python     | ❌ Failure |      33 |     511.72 |           6102 |           11905 |
 
 ## Failures
 
@@ -210,5 +214,23 @@ Now you can test the API using Postman or any other API client.
 You can use tools like Postman or CURL to send requests to your API.
 
 This full implementation should avoid previous issues and meet all the specified requirements. If you need more help, feel free to ask!
+```
+
+### meta-llama/llama-3.3-70b-instruct - Java
+Feedback:
+```
+Failed to create a CRUD API using Java
+```
+
+### meta-llama/llama-3.3-70b-instruct - JavaScript
+Feedback:
+```
+An error occurred while connecting to the database.
+```
+
+### deepseek/deepseek-r1-distill-llama-70b - Python
+Feedback:
+```
+
 ```
 
