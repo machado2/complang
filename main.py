@@ -17,18 +17,18 @@ import time
 
 # Constants
 LLMS = ["google/gemini-2.0-flash-001", "qwen/qwen-2.5-coder-32b-instruct", "openai/gpt-4o-mini", "meta-llama/llama-3.3-70b-instruct", "deepseek/deepseek-r1-distill-llama-70b"]
-# STACKS = ["Python", "Java", "JavaScript", "C++", "C#", "PHP", "Rust", "TypeScript", "Kotlin", "Ruby", "Scala", "Zig", "Haskell", "Perl", "Raku", "Clojure", "Common Lisp", "OCAML", "D lang", "Elixir"]
+STACKS = ["Python", "Java", "JavaScript", "C++", "C#", "PHP", "Rust", "TypeScript", "Kotlin", "Ruby", "Scala", "Zig", "Haskell", "Perl", "Raku", "Clojure", "Common Lisp", "OCAML", "D lang", "Elixir"]
 
 # LLMS = ["google/gemini-2.0-flash-001"]
-STACKS = ["Python", "Java", "JavaScript"]
+# STACKS = ["Python", "Java", "JavaScript"]
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 DBNAME = "complang"
 DBUSER = "testuser"
 DBPASSWORD = "Saloon5-Moody-Observing"
 BASE_DIR = "./test_projects"
-MAX_STEPS = 6
-MAX_ATTEMPTS = 3
+MAX_STEPS = 30
+MAX_ATTEMPTS = 10
 BASE_PORT = 8080
 CHECKPOINT_FILE = "./checkpoint.json"
 REPORT_FILE = "test_report.md"
@@ -81,7 +81,7 @@ def sanitize_name(name):
 
 SUPPORTS_TOOLS = False
 
-def run_command(command_args, cwd=None, timeout=None, check=False):
+def run_command(command_args, cwd=None, timeout=300, check=False):
     print(f"Executing: {' '.join(command_args)}...")
     return subprocess.run(command_args, cwd=cwd, timeout=timeout, capture_output=True, text=True, encoding="utf-8", errors="replace", check=check)
             
@@ -381,8 +381,6 @@ def test_stack(llm: str, stack: str, results: List[Dict[str, Any]], use_tool_cal
     {DATABASE_SQL}
     ```
 
-    * Write as many files as possible in a single step to avoid running out of steps.
-    * If you need to run a shell command, use an entrypoint on your docker container
     * Don't try to build or test it, it will be done automatically, and I'll call you back with feedback for another attempt
 
     """
