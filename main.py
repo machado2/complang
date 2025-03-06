@@ -28,7 +28,7 @@ DBUSER = "testuser"
 DBPASSWORD = "Saloon5-Moody-Observing"
 BASE_DIR = "./test_projects"
 MAX_STEPS = 6
-MAX_ATTEMPTS = 10
+MAX_ATTEMPTS = 3
 BASE_PORT = 8080
 CHECKPOINT_FILE = "./checkpoint.json"
 REPORT_FILE = "test_report.md"
@@ -444,17 +444,13 @@ def generate_report(results: List[Dict[str, Any]]):
         f.write("# Test Report\n\n")
         f.write(f"Generated on: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
         f.write("## Results\n\n")
-        headers = ["LLM", "Stack", "Status", "Steps", "Time (s)", "Input Tokens", "Output Tokens"]
+        headers = ["LLM", "Stack", "Status", "Steps", "Attempts", "Time (s)", "Input Tokens", "Output Tokens"]
         table = [
             [r["llm"], r["stack"], "✅ Success" if r["success"] else "❌ Failure", 
-             r["steps"], f"{r['duration']:.2f}", r["input_tokens"], r["output_tokens"]]
+             r["steps"], r["attempts"], f"{r['duration']:.2f}", r["input_tokens"], r["output_tokens"]]
             for r in results
         ]
         f.write(tabulate(table, headers, tablefmt="github"))
-        f.write("\n\n## Failures\n\n")
-        for r in results:
-            if not r["success"]:
-                f.write(f"### {r['llm']} - {r['stack']}\nFeedback:\n```\n{r['feedback']}\n```\n\n")
 
 # Main Execution
 def main():
