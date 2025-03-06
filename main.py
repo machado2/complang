@@ -15,11 +15,8 @@ from config import get_pg_password
 from runcommand import check_docker, stop_and_remove_docker, build_and_run_docker, get_docker_logs
 
 # Constants
-# LLMS = ["qwen/qwen-2.5-coder-32b-instruct"]
-# LLMS = ["google/gemini-2.0-flash-001", "qwen/qwen-2.5-coder-32b-instruct", "openai/gpt-4o-mini", "meta-llama/llama-3.3-70b-instruct", "deepseek/deepseek-r1-distill-llama-70b"]
-# LLMS = ["openai/gpt-4o"]
+LLMS = ["google/gemini-2.0-flash-001", "qwen/qwen-2.5-coder-32b-instruct", "openai/gpt-4o-mini", "meta-llama/llama-3.3-70b-instruct", "deepseek/deepseek-r1-distill-llama-70b"]
 # STACKS = ["Python", "Java", "JavaScript", "C++", "C#", "PHP", "Rust", "TypeScript", "Kotlin", "Ruby", "Scala", "Zig", "Haskell", "Perl", "Raku", "Clojure", "Common Lisp", "OCAML", "D lang", "Elixir"]
-LLMS = ["google/gemini-2.0-flash-001", "qwen/qwen-2.5-coder-32b-instruct", "openai/gpt-4o-mini"]
 STACKS = ["Python", "Java", "JavaScript"]
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 PGPASSWORD = get_pg_password()
@@ -353,10 +350,6 @@ def test_stack(llm: str, stack: str, results: List[Dict[str, Any]], supports_too
     try:
         response = agent.run(prompt)
         success = SUCCESS_FLAG
-
-        if not success:
-            response = agent.run("Answer with a short description of why our test failed", reset=False)
-
         steps = len(agent.logs)
     except Exception as e:
         success = False
