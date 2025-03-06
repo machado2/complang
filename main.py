@@ -16,9 +16,11 @@ from runcommand import check_docker, stop_and_remove_docker, build_and_run_docke
 
 # Constants
 # LLMS = ["qwen/qwen-2.5-coder-32b-instruct"]
-LLMS = ["google/gemini-2.0-flash-001", "deepseek/deepseek-r1:free", "qwen/qwen-2.5-coder-32b-instruct", "google/gemini-2.0-pro-exp-02-05:free", "openai/gpt-4o-mini", "meta-llama/llama-3.3-70b-instruct", "deepseek/deepseek-r1-distill-llama-70b"]
+# LLMS = ["google/gemini-2.0-flash-001", "qwen/qwen-2.5-coder-32b-instruct", "openai/gpt-4o-mini", "meta-llama/llama-3.3-70b-instruct", "deepseek/deepseek-r1-distill-llama-70b"]
 # LLMS = ["openai/gpt-4o"]
-STACKS = ["Python", "Java", "Go", "JavaScript", "C++", "C#", "PHP", "Rust", "TypeScript", "Kotlin", "Ruby", "Scala", "Zig", "Haskell", "Perl", "Raku", "Clojure", "Common Lisp", "OCAML", "D lang", "Elixir"]
+# STACKS = ["Python", "Java", "JavaScript", "C++", "C#", "PHP", "Rust", "TypeScript", "Kotlin", "Ruby", "Scala", "Zig", "Haskell", "Perl", "Raku", "Clojure", "Common Lisp", "OCAML", "D lang", "Elixir"]
+LLMS = ["google/gemini-2.0-flash-001", "qwen/qwen-2.5-coder-32b-instruct", "openai/gpt-4o-mini"]
+STACKS = ["Python", "Java", "JavaScript"]
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 PGPASSWORD = get_pg_password()
 BASE_DIR = "./test_projects"
@@ -169,7 +171,7 @@ def get_tools(directory: str, test_callback):
             Dictionary with success status and file content or error.
         """
         try:
-            with open(os.path.join(directory, filename), "r", encoding="utf-8") as f:
+            with open(os.path.join(directory, filename), "r", encoding="utf-8", newline="\n") as f:
                 return {"success": True, "content": f.read()}
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -189,7 +191,7 @@ def get_tools(directory: str, test_callback):
         try:
             file_path = os.path.join(directory, filename)
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            with open(file_path, "w", encoding="utf-8") as f:
+            with open(file_path, "w", encoding="utf-8", newline="\n") as f:
                 f.write(content)
             return {"success": True, "message": f"Wrote {filename}"}
         except Exception as e:
@@ -208,7 +210,7 @@ def get_tools(directory: str, test_callback):
             Dictionary with success status and message or error.
         """
         try:
-            with open(os.path.join(directory, filename), "a", encoding="utf-8") as f:
+            with open(os.path.join(directory, filename), "a", encoding="utf-8", newline="\n") as f:
                 f.write(content)
             return {"success": True, "message": f"Appended to {filename}"}
         except Exception as e:
