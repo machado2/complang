@@ -1,0 +1,1 @@
+scala_checkstyle.ScalaCheckstylePlugin.autoImport.scalaCheckstyleCheck := true

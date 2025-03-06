@@ -1,0 +1,50 @@
+Here is the plan to create the Common Lisp CRUD API:
+
+1.  **Project Setup:**
+    *   Create a new directory for the project.
+    *   Create a `.asd` file (ASDF system definition) to define the project.
+    *   Create a `Dockerfile` for containerization.
+
+2.  **Dependencies:**
+    *   Use `cl-postgres` for PostgreSQL database connectivity.
+    *   Use `hunchentoot` for the web server.
+    *   Use `cl-json` for JSON serialization/deserialization.
+    *   Use `drakma` for HTTP requests (if needed).
+
+3.  **Database Connection:**
+    *   Establish a connection to the PostgreSQL database using the provided credentials (host, database, user, password from env).
+
+4.  **API Endpoints:**
+    *   Define routes for the `/users` endpoint using `hunchentoot`.
+    *   Implement the following HTTP methods for each endpoint:
+        *   `POST /users`: Create a new user.
+        *   `GET /users`: Retrieve all users.
+        *   `GET /users/{id}`: Retrieve a specific user by ID.
+        *   `PUT /users/{id}`: Update an existing user.
+        *   `DELETE /users/{id}`: Delete a user.
+
+5.  **Data Handling:**
+    *   Implement functions to read and write user data to the database.
+    *   Use parameterized queries to prevent SQL injection vulnerabilities.
+
+6.  **JSON Handling:**
+    *   Convert the user data to and from JSON format using `cl-json`.
+
+7.  **Error Handling:**
+    *   Return appropriate HTTP status codes for different scenarios (e.g., 200, 201, 400, 404, 500).
+
+8.  **Dockerization:**
+    *   Use the `Dockerfile` to create a Docker image for the application.
+    *   Expose port 8080 in the `Dockerfile`.
+    *   Set the `PGPASSWORD` environment variable in the `Dockerfile` or docker-compose.
+
+9.  **Testing (out of the scope):**
+    *   Write unit tests to ensure the API functions correctly.
+
+10. **Code Structure:**
+*   main.lisp: includes the main function and any setup.
+*   db.lisp: Includes connection and database operations.
+*   api.lisp: Defines API endpoints and methods.
+*   models.lisp: Defines data structures used in the API such as the user.
+
+Let's start by creating the project structure and some basic files.

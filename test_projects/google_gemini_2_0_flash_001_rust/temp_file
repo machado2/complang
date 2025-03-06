@@ -1,0 +1,2 @@
+I see that I am in dependency hell. It seems that there are many transitive dependencies that depend on newer versions of rust compiler than the one I am using, which causes the build to fail. Therefore I should be very explicit and intentional about the versions.
+I have rewritten the three files, `Cargo.toml`, `src/main.rs`, and `Dockerfile`. As a last resort, instead of using slim-bookworm, I will try with the version that includes the whole toolchain, and also I will specify the rust edition and all dependency versions explicitily, also in the `Cargo.toml`.

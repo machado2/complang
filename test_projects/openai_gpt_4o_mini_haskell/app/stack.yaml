@@ -1,0 +1,12 @@
+# This YAML file is used by Stack to define project settings.
+
+# The resolver determines the version of GHC and package set to use
+resolver: lts-18.28
+
+packages:
+- .
+
+# Additional flags can be added here.
+extra-deps:
+  - postgresql-simple-0.6.4.1
+  - scotty-0.12.2

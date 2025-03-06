@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - '8080:8080'
+    environment:
+      - PGPASSWORD=Saloon5-Moody-Observing
+    depends_on:
+      - db
+
+  db:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: Saloon5-Moody-Observing
+      POSTGRES_DB: complang
+    ports:
+      - '5432:5432'

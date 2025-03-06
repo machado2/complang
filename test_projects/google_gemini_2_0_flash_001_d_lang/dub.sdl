@@ -1,0 +1,19 @@
+sourceCompatibility = "1.0"
+targetCompatibility = "1.0"
+name = "crud_api"
+description = "A simple CRUD API in D"
+version = "0.1.0"
+
+dependencies {
+    vibe-d: "~>0.9.6"
+    postgresql:
+    { name = "postgresql", version = "~>3.0.0" }
+    
+}
+
+configurations {
+    application {
+        targetType = "executable"
+        mainSourceFile = "app.d"
+    }
+}

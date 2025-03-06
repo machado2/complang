@@ -16,7 +16,7 @@ import subprocess
 import time
 
 # Constants
-LLMS = ["google/gemini-2.0-flash-001", "qwen/qwen-2.5-coder-32b-instruct", "openai/gpt-4o-mini", "meta-llama/llama-3.3-70b-instruct", "deepseek/deepseek-r1-distill-llama-70b"]
+LLMS = ["google/gemini-2.0-flash-001", "openai/gpt-4o-mini", "meta-llama/llama-3.3-70b-instruct", "deepseek/deepseek-r1-distill-llama-70b", "qwen/qwen-2.5-72b-instruct", "deepseek/deepseek-chat", "mistralai/mixtral-8x7b-instruct"]
 STACKS = ["Python", "Java", "JavaScript", "C++", "C#", "PHP", "Rust", "TypeScript", "Kotlin", "Ruby", "Scala", "Zig", "Haskell", "Perl", "Raku", "Clojure", "Common Lisp", "OCAML", "D lang", "Elixir"]
 
 # LLMS = ["google/gemini-2.0-flash-001"]
@@ -27,8 +27,8 @@ DBNAME = "complang"
 DBUSER = "testuser"
 DBPASSWORD = "Saloon5-Moody-Observing"
 BASE_DIR = "./test_projects"
-MAX_STEPS = 30
-MAX_ATTEMPTS = 10
+MAX_STEPS = 10
+MAX_ATTEMPTS = 5
 BASE_PORT = 8080
 CHECKPOINT_FILE = "./checkpoint.json"
 REPORT_FILE = "test_report.md"
@@ -79,8 +79,6 @@ def sanitize_name(name):
         newname = newname + "x"
     return newname
 
-SUPPORTS_TOOLS = False
-
 def run_command(command_args, cwd=None, timeout=300, check=False):
     print(f"Executing: {' '.join(command_args)}...")
     return subprocess.run(command_args, cwd=cwd, timeout=timeout, capture_output=True, text=True, encoding="utf-8", errors="replace", check=check)
@@ -123,24 +121,6 @@ def get_docker_logs(container_name):
         return result.stdout + result.stderr
     except subprocess.CalledProcessError:
         return "Unable to retrieve container logs."
-
-
-@tool
-def test_tool_support() -> str:
-    """Call it to confirm tool calls are working."""
-    global SUPPORTS_TOOLS
-    SUPPORTS_TOOLS = True
-    return "Tool ran successfully"
-
-def check_tool_support(model) -> bool:
-    global SUPPORTS_TOOLS
-    SUPPORTS_TOOLS = False
-    agent = ToolCallingAgent(tools=[test_tool_support], model=model, max_steps=1)
-    try:
-        agent.run("Call test tool support")
-        return SUPPORTS_TOOLS
-    except Exception as e:
-        return SUPPORTS_TOOLS
 
 def clear_database():
     conn = psycopg2.connect(dbname=DBNAME, user=DBUSER, password=DBPASSWORD, host="localhost", port=5432)
@@ -463,7 +443,7 @@ def main():
         for llm in LLMS:
             # model_supports_tools = check_tool_support(llm)
             for stack in STACKS:
-                test_stack(llm, stack, results, False)
+                test_stack(llm, stack, results, True)
     except KeyboardInterrupt:
         print("\nInterrupted by user. Saving checkpoint and generating final report...")
     finally:

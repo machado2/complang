@@ -1,0 +1,11 @@
+name = "crud-api"
+version = "0.1.0"
+
+[dependencies]
+pg = {}
+
+[build]
+step.build.args = .{
+    name = "my_app",
+    root_source_file = "src/main.zig",
+}

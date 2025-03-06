@@ -1,0 +1,33 @@
+Here's a basic plan:
+
+1.  **Project Setup:**
+    *   Initialize a new TypeScript project with `npm init -y` and `tsc --init`.
+    *   Install necessary packages: `npm install express pg dotenv zod`
+    *   Create a `src` directory for source files.
+    *   Setup tsconfig.json to correctly compile the TS files
+2.  **Database Connection:**
+    *   Use `pg` to connect to the PostgreSQL database.
+    *   Store database credentials in `.env` file and access them using `dotenv`.
+3.  **Express App:**
+    *   Create an Express app with necessary middleware (e.g., `express.json()` for parsing JSON bodies).
+4.  **User Model and Routes:**
+    *   Define a user model/interface with `id`, `name`, and `email` properties using zod for validation schema.
+    *   Implement the CRUD operations for the `/users` endpoint:
+        *   `POST /users`: Create a new user.
+        *   `GET /users`: Get all users.
+        *   `GET /users/:id`: Get a single user by ID.
+        *   `PUT /users/:id`: Update a user.
+        *   `DELETE /users/:id`: Delete a user.
+5.  **Error Handling:**
+    *   Implement error handling for database operations and invalid requests.
+    * Implement zod validation for the requests
+6.  **Dockerization:**
+    *   Create a `Dockerfile` to containerize the application.
+    *   Use a Node.js base image.
+    *   Copy the `package.json` and `package-lock.json` files.
+    *   Run `npm install` to install dependencies.
+    *   Copy the source code.
+    *   Build the TypeScript code.
+    *   Specify the command to start the application.
+
+Now I will implements points 1 and 2, creating the basic files and installing dependencies

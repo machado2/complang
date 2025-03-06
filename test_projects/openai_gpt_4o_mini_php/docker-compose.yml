@@ -1,0 +1,20 @@
+version: '3.7'
+
+services:
+  php:
+    build: .
+    ports:
+      - "8080:80"
+    environment:
+      - PGPASSWORD=Saloon5-Moody-Observing
+    depends_on:
+      - db
+
+  db:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: complang
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: Saloon5-Moody-Observing
+    ports:
+      - "5432:5432"
