@@ -1,2 +1,0 @@
-
-CREATE DATABASE test_meta_llama_llama_3_3_70b_instruct_javascript;

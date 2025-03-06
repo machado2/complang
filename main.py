@@ -1,5 +1,6 @@
 import os
 import json
+from textwrap import dedent
 import requests
 import time
 import psycopg2
@@ -11,26 +12,55 @@ import sys
 from smolagents import CodeAgent, tool, LiteLLMModel, ToolCallingAgent
 from tabulate import tabulate
 from typing import List, Dict, Any
-from config import get_pg_password
-from runcommand import check_docker, stop_and_remove_docker, build_and_run_docker, get_docker_logs
+import subprocess
+import time
 
 # Constants
-LLMS = ["google/gemini-2.0-flash-001", "qwen/qwen-2.5-coder-32b-instruct", "openai/gpt-4o-mini", "meta-llama/llama-3.3-70b-instruct", "deepseek/deepseek-r1-distill-llama-70b"]
+# LLMS = ["google/gemini-2.0-flash-001", "qwen/qwen-2.5-coder-32b-instruct", "openai/gpt-4o-mini", "meta-llama/llama-3.3-70b-instruct", "deepseek/deepseek-r1-distill-llama-70b"]
 # STACKS = ["Python", "Java", "JavaScript", "C++", "C#", "PHP", "Rust", "TypeScript", "Kotlin", "Ruby", "Scala", "Zig", "Haskell", "Perl", "Raku", "Clojure", "Common Lisp", "OCAML", "D lang", "Elixir"]
+
+LLMS = ["google/gemini-2.0-flash-001"]
 STACKS = ["Python", "Java", "JavaScript"]
+
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-PGPASSWORD = get_pg_password()
+DBNAME = "complang"
+DBUSER = "testuser"
+DBPASSWORD = "Saloon5-Moody-Observing"
 BASE_DIR = "./test_projects"
-MAX_STEPS = 30
+MAX_STEPS = 6
+MAX_ATTEMPTS = 10
 BASE_PORT = 8080
 CHECKPOINT_FILE = "./checkpoint.json"
 REPORT_FILE = "test_report.md"
 
-# Global success flag
-SUCCESS_FLAG = False
+DATABASE_SQL = dedent("""
+    -- Create the database
+    CREATE DATABASE complang;
+
+    -- Create the user with a simple password
+    CREATE USER testuser WITH PASSWORD 'Saloon5-Moody-Observing';
+
+    -- Grant CONNECT privilege on the database to the user
+    GRANT CONNECT ON DATABASE complang TO testuser;
+
+    -- Connect to the newly created database
+    \connect complang
+
+    -- Create the users table with the specified structure
+    CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL
+    );
+
+    -- Grant CRUD permissions (SELECT, INSERT, UPDATE, DELETE) on the users table to the user
+    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE users TO testuser;
+    GRANT USAGE, SELECT ON SEQUENCE users_id_seq TO testuser;
+    """)
+
 
 # Verify environment variables
-if not OPENROUTER_API_KEY or not PGPASSWORD:
+if not OPENROUTER_API_KEY or not DBPASSWORD:
     raise ValueError("Missing required environment variables: OPENROUTER_API_KEY and PGPASSWORD must be set.")
 
 def find_free_port(start_port):
@@ -51,6 +81,50 @@ def sanitize_name(name):
 
 SUPPORTS_TOOLS = False
 
+def run_command(command_args, cwd=None, timeout=None, check=False):
+    print(f"Executing: {' '.join(command_args)}...")
+    return subprocess.run(command_args, cwd=cwd, timeout=timeout, capture_output=True, text=True, encoding="utf-8", errors="replace", check=check)
+            
+def stop_and_remove_docker(container_name):
+    """Stop and remove a Docker container."""
+    run_command(["docker", "stop", container_name])
+    run_command(["docker", "rm", container_name])
+
+def check_docker():
+    """Check if Docker is available and running."""
+    try:
+        result = run_command(["docker", "info"])
+        return result.returncode == 0
+    except (subprocess.SubprocessError, FileNotFoundError):
+        return False
+    
+# Docker and Testing Functions
+def build_and_run_docker(directory, container_name, port):
+    """Build and run a Docker container, returning success status and error message if any."""
+    try:
+        run_command(["docker", "build", "-t", f"api_{container_name}", "."], cwd=directory, check=True)
+    except subprocess.CalledProcessError as e:
+        return False, f"Docker build failed:\n{e.stderr}"
+    
+    try:
+        run_command(
+            ["docker", "run", "-d", "--name", container_name, "-p", f"{port}:8080", 
+             "-e", f"PGPASSWORD={DBPASSWORD}", f"api_{container_name}"],
+            cwd=directory, check=True
+        )
+        return True, ""
+    except subprocess.CalledProcessError as e:
+        return False, f"Docker run failed:\n{e.stderr}"
+
+def get_docker_logs(container_name):
+    """Retrieve logs from a Docker container."""
+    try:
+        result = run_command(["docker", "logs", container_name])
+        return result.stdout + result.stderr
+    except subprocess.CalledProcessError:
+        return "Unable to retrieve container logs."
+
+
 @tool
 def test_tool_support() -> str:
     """Call it to confirm tool calls are working."""
@@ -68,19 +142,11 @@ def check_tool_support(model) -> bool:
     except Exception as e:
         return SUPPORTS_TOOLS
 
-def create_database(db_name):
-    """Create a PostgreSQL database."""
-    conn = psycopg2.connect(dbname="postgres", user="postgres", password=PGPASSWORD, host="localhost", port=5432)
+def clear_database():
+    conn = psycopg2.connect(dbname=DBNAME, user=DBUSER, password=DBPASSWORD, host="localhost", port=5432)
     conn.autocommit = True
     with conn.cursor() as cur:
-        cur.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(db_name)))
-    conn.close()
-
-def drop_database(db_name):
-    conn = psycopg2.connect(dbname="postgres", user="postgres", password=PGPASSWORD, host="localhost", port=5432)
-    conn.autocommit = True
-    with conn.cursor() as cur:
-        cur.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(db_name)))
+        cur.execute(sql.SQL("DELETE FROM USERS"))
     conn.close()
 
 def test_api(port):
@@ -138,64 +204,63 @@ def test_api(port):
     return {"results": results, "feedback": "\n".join(feedback)}
 
 # Agent Tools
-def get_tools(directory: str, test_callback):
+def get_tools(directory: str):
     """Define tools for the CodeAgent to manipulate files and test the solution."""
 
     @tool
-    def list_files() -> Dict[str, Any]:
+    def list_files() -> List[str]:
         """
-        List all files in the project directory.
+        Return a list with the filename of all files in the project directory.
 
         Returns:
             Dictionary with success status and list of file names.
         """
-        try:
-            files = [os.path.relpath(os.path.join(root, f), directory) 
-                     for root, _, fs in os.walk(directory) for f in fs]
-            return {"success": True, "files": files}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        files = [os.path.relpath(os.path.join(root, f), directory) 
+                    for root, _, fs in os.walk(directory) for f in fs]
+        return files
 
     @tool
-    def read_file(filename: str) -> Dict[str, Any]:
+    def read_file(filename: str) -> str | None:
         """
-        Read the contents of a file.
+        Read the contents of a file or None if it doesn't exist.
 
         Args:
             filename: Path to the file relative to the project directory.
 
         Returns:
-            Dictionary with success status and file content or error.
+            The contents of the file or None
         """
         try:
             with open(os.path.join(directory, filename), "r", encoding="utf-8", newline="\n") as f:
-                return {"success": True, "content": f.read()}
+                return f.read()
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            print(f"Error reading file {filename}: {e}")
+            return None
 
     @tool
-    def write_file(filename: str, content: str) -> Dict[str, Any]:
+    def write_file(filename: str, content: str) -> bool:
         """
-        Write or overwrite a file with the given content.
+        Write or overwrite a file with the given content, creating directories if needed.
 
         Args:
             filename: Path to the file relative to the project directory.
             content: Content to write to the file.
 
         Returns:
-            Dictionary with success status and message or error.
+            True if successful, False otherwise.
         """
         try:
             file_path = os.path.join(directory, filename)
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
             with open(file_path, "w", encoding="utf-8", newline="\n") as f:
                 f.write(content)
-            return {"success": True, "message": f"Wrote {filename}"}
+            return True
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            print(f"Error writing file {filename}: {e}")
+            return False
 
     @tool
-    def append_file(filename: str, content: str) -> Dict[str, Any]:
+    def append_file(filename: str, content: str) -> bool:
         """
         Append content to the end of a file.
 
@@ -204,17 +269,18 @@ def get_tools(directory: str, test_callback):
             content: Content to append.
 
         Returns:
-            Dictionary with success status and message or error.
+            True if successful, False otherwise.
         """
         try:
             with open(os.path.join(directory, filename), "a", encoding="utf-8", newline="\n") as f:
                 f.write(content)
-            return {"success": True, "message": f"Appended to {filename}"}
+            return True
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            print(f"Error appending to file {filename}: {e}")
+            return False
 
     @tool
-    def delete_file(filename: str) -> Dict[str, Any]:
+    def delete_file(filename: str) -> bool:
         """
         Delete a file from the project directory.
 
@@ -222,140 +288,128 @@ def get_tools(directory: str, test_callback):
             filename: Path to the file relative to the project directory.
 
         Returns:
-            Dictionary with success status and message or error.
+            True if successful, False otherwise.
         """
         try:
             os.remove(os.path.join(directory, filename))
-            return {"success": True, "message": f"Deleted {filename}"}
+            return True
         except Exception as e:
-            return {"success": False, "error": str(e)}
+            print(f"Error deleting file {filename}: {e}")
+            return False
 
-    @tool
-    def test_solution() -> Dict[str, Any]:
-        """
-        Test the current project files by building a Docker container, running it, and checking the CRUD API endpoints.
-        This tool uses your Dockerfile and app code to create a container, connects it to a PostgreSQL database, and tests
-        the /users endpoints (POST, GET, PUT, DELETE). Use this to verify your solution works and get feedback to fix it.
-
-        Returns:
-            A dictionary with:
-            - "success": bool - True if all API tests (POST, GET, PUT, DELETE) pass, False if any fail or if build/run errors occur.
-            - "feedback": str - Details to guide your next steps. If "success" is True, it confirms the solution works (e.g., "All tests passed!").
-            If "success" is False, it includes error messages (e.g., build failures, API test results, container logs) to help you debug.
-
-        Usage:
-            Call this after writing your Dockerfile and app code. If "success" is False, use the "feedback" to identify and fix issues
-            (e.g., adjust files with write_file or append_file), then call test_solution again. Repeat until "success" is True or you
-            run out of steps.
-        """
-        global SUCCESS_FLAG
-        success, feedback = test_callback(directory)
-        if success:
-            SUCCESS_FLAG = True
-        return {
-            "success": success,  # True only if all tests pass
-            "feedback": feedback  # Details for the agent to act on
-        }
-
-    return [list_files, read_file, write_file, append_file, delete_file, test_solution]
+    return [list_files, read_file, write_file, append_file, delete_file]
 
 # Checkpoint management
-def save_checkpoint(completed: set, results: List[Dict[str, Any]]):
+def save_checkpoint(results: List[Dict[str, Any]]):
     """Save current progress to checkpoint file."""
     with open(CHECKPOINT_FILE, 'w') as f:
         json.dump({
-            'completed': list(completed),
             'results': results
         }, f, indent=2)
 
-def load_checkpoint() -> tuple[set, List[Dict[str, Any]]]:
+def load_checkpoint() -> List[Dict[str, Any]]:
     """Load progress from checkpoint file if exists."""
     if os.path.exists(CHECKPOINT_FILE):
         with open(CHECKPOINT_FILE, 'r') as f:
             data = json.load(f)
-            return set(data['completed']), data['results']
-    return set(), []
+            return data['results']
+    return []
+
+def test_solution(dir: str, unique_id: str) -> tuple[bool, str]:
+    container_name = f"test_{unique_id}"
+    stop_and_remove_docker(container_name)
+    clear_database()
+    port = find_free_port(BASE_PORT)
+    try:
+        success, error = build_and_run_docker(dir, container_name, port)
+        if not success:
+            return False, f"Build/Run Error:\n{error}"
+        clear_database()
+        test_result = test_api(port)
+        logs = get_docker_logs(container_name)
+        if not all(test_result["results"].values()):
+            return False, f"API Tests:\n{test_result['feedback']}\nContainer Logs:\n{logs}"
+        return True, "All tests passed!"
+    finally:
+        stop_and_remove_docker(container_name)
 
 # Core Functionality
-def test_stack(llm: str, stack: str, results: List[Dict[str, Any]], supports_tools: bool, completed: set):
+def test_stack(llm: str, stack: str, results: List[Dict[str, Any]], use_tool_calling_agent: bool):
     """Test an LLM with a specific stack."""
-    global SUCCESS_FLAG
-    test_id = f"{llm}|{stack}"
-    if test_id in completed:
-        return  # Skip already completed tests
-    # Reset success flag before test
-    SUCCESS_FLAG = False
+
+    if any(r["llm"] == llm and r["stack"] == stack for r in results):
+        return # already tested, skip it
+    
+    unique_id = f"{sanitize_name(llm)}_{sanitize_name(stack)}"
 
     print(f"\n### Testing {llm} with {stack}")
     start_time = time.time()
-    unique_id = f"{sanitize_name(llm)}_{sanitize_name(stack)}"
+    
     directory = os.path.join(BASE_DIR, unique_id)
-    db_name = f"test_{unique_id}"
-    container_name = f"test_{unique_id}"
-    port = find_free_port(BASE_PORT)
+    
 
     # Setup
     os.makedirs(directory, exist_ok=True)
 
-    # Define test callback
-    def test_callback(dir):
-        global SUCCESS_FLAG
-        SUCCESS_FLAG = False
-        stop_and_remove_docker(container_name)
-        try:
-            success, error = build_and_run_docker(dir, container_name, port)
-            if not success:
-                return False, f"Build/Run Error:\n{error}"
-            drop_database(db_name)
-            create_database(db_name)
-            test_result = test_api(port)
-            logs = get_docker_logs(container_name)
-            if not all(test_result["results"].values()):
-                return False, f"API Tests:\n{test_result['feedback']}\nContainer Logs:\n{logs}"
-            SUCCESS_FLAG = True
-            return True, "All tests passed!"
-        finally:
-            stop_and_remove_docker(container_name)
-
     # Configure agent
-    tools = get_tools(directory, test_callback)
+    tools = get_tools(directory)
     model = LiteLLMModel(model_id=f"openrouter/{llm}")
-    if supports_tools:
+    if use_tool_calling_agent:
         agent = ToolCallingAgent(tools=tools, model=model, max_steps=MAX_STEPS, add_base_tools=True)
     else:
         agent = CodeAgent(tools=tools, model=model, max_steps=MAX_STEPS, add_base_tools=True)
     
-
     prompt = f"""
-    Create a CRUD API using {stack} that:
-    - Connects to a PostgreSQL database at host.docker.internal:5432, database '{db_name}', user 'postgres', password from PGPASSWORD env var.
-    - The database is empty on first run; detect this and create a 'users' table with columns: id (auto-incrementing primary key), name (text), email (text).
-    - Runs in a Docker container on port 8080.
-    - Exposes /users endpoints with the following operations:
-    - POST /users: Creates a user. Accepts JSON {{ "name": string, "email": string }}, returns 201 with {{ "id": int, "name": string, "email": string }}.
-    - GET /users: Returns a list of all users as [{{"id": int, "name": string, "email": string}}, ...], status 200.
-    - GET /users/{{id}}: Returns a single user as {{ "id": int, "name": string, "email": string }}, status 200, or 404 if not found.
-    - PUT /users/{{id}}: Updates a user. Accepts {{ "name": string, "email": string }}, returns 200/204, or 404 if not found.
-    - DELETE /users/{{id}}: Deletes a user, returns 200/204, or 404 if not found.
-    Use tools to:
-    - Write files with write_file (e.g., Dockerfile, app code).
-    - Modify files with append_file or overwrite with write_file.
-    - Check files with list_files and read_file.
-    - Delete files with delete_file if needed.
-    - Test with test_solution, which builds the Docker container and tests all endpoints, returning feedback if any fail.
-    Iterate using feedback until all tests pass or you exhaust steps.
+    ## TASK: Create a CRUD API using {stack} with these requirements:
+
+    * Connects to a PostgreSQL database at host.docker.internal:5432, database '{DBNAME}', user '{DBUSER}', password from PGPASSWORD env var.
+    * Runs in a Docker container, you need to create a Dockerfile for it
+    * Listen on port 8080
+    * Exposes /users endpoints with the following operations:
+        - POST /users: Creates a user. Accepts JSON {{ "name": string, "email": string }}, returns 201 with {{ "id": int, "name": string, "email": string }}.
+        - GET /users: Returns a list of all users as [{{"id": int, "name": string, "email": string}}, ...], status 200.
+        - GET /users/{{id}}: Returns a single user as {{ "id": int, "name": string, "email": string }}, status 200, or 404 if not found.
+        - PUT /users/{{id}}: Updates a user. Accepts {{ "name": string, "email": string }}, returns 200/204, or 404 if not found.
+        - DELETE /users/{{id}}: Deletes a user, returns 200/204, or 404 if not found.
+
+    ## Observations:
+
+    * The database is already created with the following script:
+
+    ```
+    {DATABASE_SQL}
+    ```
+
+    * Write as many files as possible in a single step to avoid running out of steps.
+    * If you need to run a shell command, use an entrypoint on your docker container
+    * Don't try to build or test it, it will be done automatically, and I'll call you back with feedback for another attempt
+
     """
 
-    # Run agent
-    try:
-        response = agent.run(prompt)
-        success = SUCCESS_FLAG
-        steps = len(agent.logs)
-    except Exception as e:
-        success = False
-        steps = len(agent.logs) if 'agent' in locals() else 0
-        response = str(e)
+    num_attempts = 0
 
+    # Run agent
+    for _ in range(MAX_ATTEMPTS):
+        num_attempts += 1
+        try:
+            response = agent.run(prompt, reset=False)
+            success, feedback = test_solution(directory, unique_id)
+            if success:
+                break
+        except Exception as e:
+            success = False
+            feedback = f"Error during testing: {str(e)}"
+
+        prompt = prompt + dedent(f"""
+        
+        ----
+                
+        ## Attempt {num_attempts} failed. Feedback:
+        ```
+        {feedback}
+        ```
+        """)
+    
     # Collect results
     token_counts = agent.monitor.get_total_token_counts()
     input_tokens = token_counts['input']
@@ -364,20 +418,19 @@ def test_stack(llm: str, stack: str, results: List[Dict[str, Any]], supports_too
         "llm": llm,
         "stack": stack,
         "success": success,
-        "steps": steps,
+        "steps": len(agent.memory.steps),
         "duration": time.time() - start_time,
         "directory": directory,
-        "feedback": response if not success else "Success",
+        "feedback": feedback,
         "input_tokens": input_tokens,
-        "output_tokens": output_tokens
+        "output_tokens": output_tokens,
+        "attempts": num_attempts
     }
     results.append(result)
-    completed.add(test_id)
-    save_checkpoint(completed, results)
+    save_checkpoint(results)
     generate_report(results)
 
-    # Cleanup
-    drop_database(db_name)
+    clear_database()
 
 def generate_report(results: List[Dict[str, Any]]):
     """Generate a report of test results."""
@@ -403,21 +456,18 @@ def main():
         print("Docker is not available. Please ensure it is installed and running.")
         sys.exit(1)
 
-    completed, results = load_checkpoint()
-    if not completed:
-        shutil.rmtree(BASE_DIR, ignore_errors=True)
-        os.makedirs(BASE_DIR, exist_ok=True)
-        results = []
+    results = load_checkpoint()
+    os.makedirs(BASE_DIR, exist_ok=True)
 
     try:
         for llm in LLMS:
             # model_supports_tools = check_tool_support(llm)
             for stack in STACKS:
-                test_stack(llm, stack, results, False, completed)
+                test_stack(llm, stack, results, False)
     except KeyboardInterrupt:
         print("\nInterrupted by user. Saving checkpoint and generating final report...")
     finally:
-        save_checkpoint(completed, results)
+        save_checkpoint(results)
         generate_report(results)
         print(f"Checkpoint saved at '{CHECKPOINT_FILE}'. Report generated at '{REPORT_FILE}'.")
         print(f"Project files are in '{BASE_DIR}'.")
