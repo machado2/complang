@@ -16,10 +16,10 @@ import subprocess
 import time
 
 # Constants
-# LLMS = ["google/gemini-2.0-flash-001", "qwen/qwen-2.5-coder-32b-instruct", "openai/gpt-4o-mini", "meta-llama/llama-3.3-70b-instruct", "deepseek/deepseek-r1-distill-llama-70b"]
+LLMS = ["google/gemini-2.0-flash-001", "qwen/qwen-2.5-coder-32b-instruct", "openai/gpt-4o-mini", "meta-llama/llama-3.3-70b-instruct", "deepseek/deepseek-r1-distill-llama-70b"]
 # STACKS = ["Python", "Java", "JavaScript", "C++", "C#", "PHP", "Rust", "TypeScript", "Kotlin", "Ruby", "Scala", "Zig", "Haskell", "Perl", "Raku", "Clojure", "Common Lisp", "OCAML", "D lang", "Elixir"]
 
-LLMS = ["google/gemini-2.0-flash-001"]
+# LLMS = ["google/gemini-2.0-flash-001"]
 STACKS = ["Python", "Java", "JavaScript"]
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -347,8 +347,9 @@ def test_stack(llm: str, stack: str, results: List[Dict[str, Any]], use_tool_cal
     
     directory = os.path.join(BASE_DIR, unique_id)
     
-
     # Setup
+    if os.path.exists(directory):
+        shutil.rmtree(directory)
     os.makedirs(directory, exist_ok=True)
 
     # Configure agent
@@ -389,10 +390,15 @@ def test_stack(llm: str, stack: str, results: List[Dict[str, Any]], use_tool_cal
     num_attempts = 0
 
     # Run agent
+    reset_agent = True
     for _ in range(MAX_ATTEMPTS):
         num_attempts += 1
         try:
-            response = agent.run(prompt, reset=False)
+            agent.run(prompt, reset=reset_agent)
+            if agent.memory.steps[-1].error is None:
+                reset_agent = False
+            else:
+                reset_agent = True
             success, feedback = test_solution(directory, unique_id)
             if success:
                 break
