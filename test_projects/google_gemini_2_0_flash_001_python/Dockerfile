@@ -1,13 +1,13 @@
-FROM tiangolo/uvicorn-gunicorn-fastapi:python3.9
 
-COPY main.py /app/main.py
+FROM python:3.9-slim-buster
 
 WORKDIR /app
 
-ENV PGPASSWORD=Saloon5-Moody-Observing
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-RUN pip install psycopg2-binary
+COPY . .
 
 EXPOSE 8080
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["python", "app.py"]

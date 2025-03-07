@@ -1,20 +1,20 @@
-# Use the official Python image from the Docker Hub
-FROM python:3.9-slim
+FROM python:3.10-slim
 
-# Set the working directory in the container
+# Set environment variables
+ENV PGPASSWORD=${PGPASSWORD}
+
+# Set working directory
 WORKDIR /app
 
-# Copy requirements.txt into the container at /app
-COPY requirements.txt .
-
-# Install any needed packages specified in requirements.txt
+# Copy the requirements file and install dependencies
+COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the current directory contents into the container at /app
-COPY . .
+# Copy the application code
+COPY app.py ./
 
-# Make port 8080 available to the world outside this container
+# Expose the service on port 8080
 EXPOSE 8080
 
-# Run app.py when the container launches
+# Command to run the application
 CMD ["python", "app.py"]

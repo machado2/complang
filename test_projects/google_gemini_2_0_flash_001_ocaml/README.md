@@ -1,1 +1,0 @@
-This Dockerfile has been created. The next step would be to create the OCaml files, including 'complang.opam' and the source code in the ./bin/main.exe directory. Currently, these do not exist. Without the OCaml code that implements the CRUD API, the Dockerfile will fail to build.

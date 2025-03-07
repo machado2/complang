@@ -14,13 +14,11 @@ from tabulate import tabulate
 from typing import List, Dict, Any
 import subprocess
 import time
+import litellm
 
 # Constants
-LLMS = ["google/gemini-2.0-flash-001", "openai/gpt-4o-mini", "meta-llama/llama-3.3-70b-instruct", "deepseek/deepseek-r1-distill-llama-70b", "qwen/qwen-2.5-72b-instruct", "deepseek/deepseek-chat", "mistralai/mixtral-8x7b-instruct"]
-STACKS = ["Python", "Java", "JavaScript", "C++", "C#", "PHP", "Rust", "TypeScript", "Kotlin", "Ruby", "Scala", "Zig", "Haskell", "Perl", "Raku", "Clojure", "Common Lisp", "OCAML", "D lang", "Elixir"]
-
-# LLMS = ["google/gemini-2.0-flash-001"]
-# STACKS = ["Python", "Java", "JavaScript"]
+LLMS = ["openai/o3-mini-high", "openai/gpt-4o-mini", "google/gemini-2.0-flash-001", "meta-llama/llama-3.3-70b-instruct"]
+STACKS = ["Python", "Java", "JavaScript", "C++", "C#", "PHP", "Rust", "TypeScript", "Go", "Kotlin", "Ruby", "Scala", "Haskell", "Perl", "Raku", "Clojure", "Common Lisp", "OCAML", "D lang", "Elixir", "Idris"]
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 DBNAME = "complang"
@@ -58,6 +56,8 @@ DATABASE_SQL = dedent("""
     GRANT USAGE, SELECT ON SEQUENCE users_id_seq TO testuser;
     """)
 
+# Enable verbose mode for debugging
+litellm.set_verbose = True
 
 # Verify environment variables
 if not OPENROUTER_API_KEY or not DBPASSWORD:
@@ -355,6 +355,8 @@ def test_stack(llm: str, stack: str, results: List[Dict[str, Any]], use_tool_cal
 
     ## Observations:
 
+    * Use the write_file function to write the files, complete and ready to be tested
+    * Your files will be tested automatically by a tool, so make sure they are correct and complete
     * The database is already created with the following script:
 
     ```
@@ -440,10 +442,9 @@ def main():
     os.makedirs(BASE_DIR, exist_ok=True)
 
     try:
-        for llm in LLMS:
-            # model_supports_tools = check_tool_support(llm)
-            for stack in STACKS:
-                test_stack(llm, stack, results, True)
+        for stack in STACKS:
+            for llm in LLMS:
+                test_stack(llm, stack, results, False)
     except KeyboardInterrupt:
         print("\nInterrupted by user. Saving checkpoint and generating final report...")
     finally:
