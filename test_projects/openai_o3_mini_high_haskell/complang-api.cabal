@@ -1,0 +1,18 @@
+cabal-version:       1.10
+name:                complang-api
+version:             0.1.0.0
+build-type:          Simple
+
+executable complang-api
+  main-is:             Main.hs
+  hs-source-dirs:      .
+  default-language:    Haskell2010
+  build-depends:
+      base >=4.7 && <5,
+      scotty,
+      text,
+      postgresql-simple,
+      aeson,
+      transformers,
+      http-types,
+      postgresql-libpq-configure >=0.10 && <0.11

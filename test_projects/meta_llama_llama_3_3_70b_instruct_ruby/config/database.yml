@@ -1,0 +1,9 @@
+
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  host: host.docker.internal
+  port: 5432
+  database: complang
+  username: testuser
+  password: <%= ENV['PGPASSWORD'] %>

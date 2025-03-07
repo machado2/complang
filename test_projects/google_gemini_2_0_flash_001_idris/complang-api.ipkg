@@ -1,0 +1,13 @@
+
+package complang-api
+
+modules = Main
+
+-- Assuming these libraries exist
+dependencies =
+    base
+  --  idris-http
+   -- idris-json
+   -- idris-postgresql
+
+main = Main

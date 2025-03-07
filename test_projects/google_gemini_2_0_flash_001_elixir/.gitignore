@@ -1,0 +1,6 @@
+
+_build
+deps
+doc
+priv/static/js/app.js
+priv/static/js/app.js.map

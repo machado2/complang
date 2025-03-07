@@ -1,0 +1,23 @@
+
+opam-version: "2.0"
+name: "complang"
+version: "0.1.0"
+synopsis: "A CRUD API in OCaml"
+maintainer: "Your Name"
+authors: ["Your Name"]
+license: "MIT"
+depends: [
+  "dune" {>= "2.0"}
+  "odoc" {with-doc}
+  "ppx_deriving"
+  "cohttp-lwt-unix"
+  "yojson"
+  "postgresql"
+  "lwt_react"
+  "logs"
+  "fmt"
+]
+build: [
+  ["dune" "build" "-p" name "-j" jobs]
+]
+dev-repo: "git+https://github.com/your-username/complang.git"

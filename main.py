@@ -26,7 +26,7 @@ DBUSER = "testuser"
 DBPASSWORD = "Saloon5-Moody-Observing"
 BASE_DIR = "./test_projects"
 MAX_STEPS = 10
-MAX_ATTEMPTS = 5
+MAX_ATTEMPTS = 3
 BASE_PORT = 8080
 CHECKPOINT_FILE = "./checkpoint.json"
 REPORT_FILE = "test_report.md"
@@ -425,10 +425,14 @@ def generate_report(results: List[Dict[str, Any]]):
         f.write(f"Generated on: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
         f.write("## Results\n\n")
         headers = ["LLM", "Stack", "Status", "Steps", "Attempts", "Time (s)", "Input Tokens", "Output Tokens"]
+        # sort results by stack and then LLM
+        sorted_results = sorted(results, key=lambda r: (r["stack"], r["llm"]))
+        # when attempts > MAX_ATTEMPTS, show as a failure
+        sorted_results = [{**r, "success": r["success"] and r["attempts"] <= MAX_ATTEMPTS} for r in sorted_results]
         table = [
             [r["llm"], r["stack"], "✅ Success" if r["success"] else "❌ Failure", 
              r["steps"], r["attempts"], f"{r['duration']:.2f}", r["input_tokens"], r["output_tokens"]]
-            for r in results
+            for r in sorted_results
         ]
         f.write(tabulate(table, headers, tablefmt="github"))
 
