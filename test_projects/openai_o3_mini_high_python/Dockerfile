@@ -1,16 +1,21 @@
-FROM python:3.9
+FROM python:3.9-slim
 
-# Set the working directory
+# Set environment variables for Python
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Set the working directory in the container
 WORKDIR /app
 
-# Copy the source code into the container
-COPY . /app
+# Copy requirements file and install dependencies
+COPY requirements.txt .
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Install required Python packages
-RUN pip install fastapi uvicorn sqlalchemy psycopg2-binary
+# Copy the entire project
+COPY . .
 
-# Expose port 8080 to the outside world
+# Expose port 8080 for the API
 EXPOSE 8080
 
-# Command to run the application using uvicorn
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080"]
+# Command to run the API using uvicorn
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]

@@ -1,24 +1,23 @@
-
-# Dockerfile
-
 FROM ubuntu:20.04
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Install dependencies
-RUN apt-get update && apt-get install -y sbcl curl git
+RUN apt-get update && apt-get install -y sbcl curl git build-essential libpq-dev
 
 # Install Quicklisp
 RUN curl -O https://beta.quicklisp.org/quicklisp.lisp && \
-    sbcl --load quicklisp.lisp --non-interactive --eval "(progn (load \"quicklisp.lisp\") (quicklisp-quickstart:install) (quit))" && \
-    rm quicklisp.lisp
+    sbcl --non-interactive --load quicklisp.lisp --eval "(quicklisp-quickstart:install)" --eval "(quit)"
 
-# Set work directory
+# Copy the application and build scripts
+COPY app.lisp /app/app.lisp
+COPY build.lisp /app/build.lisp
 WORKDIR /app
 
-# Copy the server code into the container
-COPY server.lisp /app/server.lisp
+# Build a precompiled Lisp executable for fast startup.
+RUN sbcl --non-interactive --load build.lisp
 
 # Expose port 8080
 EXPOSE 8080
 
-# Start the server using SBCL in script mode
-CMD ["sbcl", "--script", "server.lisp"]
+# Run the precompiled executable
+CMD ["./app.core"]

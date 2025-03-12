@@ -1,9 +1,9 @@
 
-module example.com/users
+module complang
 
-go 1.21
+go 1.20
 
 require (
-	github.com/gorilla/mux v1.8.1
+	github.com/gorilla/mux v1.8.0
 	github.com/lib/pq v1.10.9
 )

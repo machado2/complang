@@ -1,4 +1,3 @@
-
 (executable
  (name main)
- (libraries cohttp-lwt-unix yojson postgresql lwt.react logs fmt))
+ (libraries yojson lwt lwt.unix dream postgresql))

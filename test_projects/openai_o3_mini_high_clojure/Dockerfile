@@ -1,11 +1,6 @@
-FROM clojure:lein-2.9.1
-
+FROM clojure:openjdk-17-tools-deps-slim-bullseye
 WORKDIR /app
-
-COPY . .
-
-RUN lein uberjar
-
+COPY deps.edn .
+COPY src/ src/
 EXPOSE 8080
-
-CMD ["java", "-jar", "target/crud-api.jar"]
+CMD ["clojure", "-M", "-m", "complang.core"]

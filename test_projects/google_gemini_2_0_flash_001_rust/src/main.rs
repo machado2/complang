@@ -1,171 +1,146 @@
 
-use actix_web::{delete, get, post, put, web, App, HttpResponse, HttpServer, Responder, http::header};
-use sqlx::{PgPool, FromRow};
-use serde::{Deserialize, Serialize};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    response::IntoResponse,
+    routing::{delete, get, post, put},
+    Json,
+    Router,
+};
 use dotenv::dotenv;
+use serde::{Deserialize, Serialize};
+use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
 use std::env;
-use log::{info, error};
-use actix_web_httpauth::middleware::HttpAuthentication;
-use actix_web_httpauth::extractors::bearer::BearerAuth;
+use std::net::SocketAddr;
+use tower_http::cors::CorsLayer;
+use tracing::info;
 
-#[derive(Debug, Deserialize)]
-struct AppConfig {
-    database_url: String,
-    port: u16,
+
+#[derive(Clone)]
+struct AppState {
+    db_pool: Pool<Postgres>,
 }
 
-impl AppConfig {
-    pub fn from_env() -> Result<Self, envy::Error> {
-        envy::from_env()
-    }
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct User {
+    pub id: i32,
+    pub name: String,
+    pub email: String,
 }
 
-#[derive(Debug, Serialize, FromRow)]
-struct User {
-    id: i32,
-    name: String,
-    email: String,
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CreateUser {
+    pub name: String,
+    pub email: String,
 }
 
-#[derive(Debug, Deserialize)]
-struct CreateUser {
-    name: String,
-    email: String,
-}
+async fn create_user(
+    State(state): State<AppState>,
+    Json(payload): Json<CreateUser>,
+) -> Result<(StatusCode, Json<User>), StatusCode> {
+    let query = r#"INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id, name, email;"#;
 
-#[derive(Debug, Deserialize)]
-struct UpdateUser {
-    name: String,
-    email: String,
-}
-
-
-async fn validator(auth: BearerAuth) -> Result<bool, actix_web::Error> {
-    if auth.token() == "my-secret-token" {
-        Ok(true)
-    } else {
-        Err(actix_web::error::ErrorUnauthorized("invalid token"))
-    }
-}
-
-#[post("/users")]
-async fn create_user(db_pool: web::Data<PgPool>, user: web::Json<CreateUser>) -> impl Responder {
-    let mut tx = match db_pool.begin().await {
-        Ok(tx) => tx,
-        Err(e) => {
-            error!("Failed to begin transaction: {}", e);
-            return HttpResponse::InternalServerError().finish();
-        }
-    };
-
-    let result = sqlx::query!(
-        "INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id",
-        user.name,
-        user.email
-    )
-    .fetch_one(&mut *tx)
-    .await;
-
-    let user_id = match result {
-        Ok(row) => row.id,
-        Err(e) => {
-            error!("Failed to insert user: {}", e);
-            tx.rollback().await.ok();
-            return HttpResponse::InternalServerError().finish();
-        }
-    };
-    
-    let new_user = User {
-        id: user_id,
-        name: user.name.clone(),
-        email: user.email.clone(),
-    };
-    
-    tx.commit().await.ok();
-
-    HttpResponse::Created().header(header::CONTENT_TYPE, "application/json").json(new_user)
-}
-
-#[get("/users")]
-async fn get_all_users(db_pool: web::Data<PgPool>) -> impl Responder {
-    let users = match sqlx::query_as::<_, User>("SELECT id, name, email FROM users")
-        .fetch_all(db_pool.get_ref())
-        .await
-    {
-        Ok(users) => users,
-        Err(e) => {
-            error!("Failed to fetch users: {}", e);
-            return HttpResponse::InternalServerError().finish();
-        }
-    };
-
-    HttpResponse::Ok().header(header::CONTENT_TYPE, "application/json").json(users)
-}
-
-#[get("/users/{id}")]
-async fn get_user(db_pool: web::Data<PgPool>, id: web::Path<i32>) -> impl Responder {
-    let user_id = id.into_inner();
-    let user = match sqlx::query_as::<_, User>("SELECT id, name, email FROM users WHERE id = $1")
-        .bind(user_id)
-        .fetch_optional(db_pool.get_ref())
-        .await
-    {
-        Ok(Some(user)) => user,
-        Ok(None) => return HttpResponse::NotFound().finish(),
-        Err(e) => {
-            error!("Failed to fetch user: {}", e);
-            return HttpResponse::InternalServerError().finish();
-        }
-    };
-
-    HttpResponse::Ok().header(header::CONTENT_TYPE, "application/json").json(user)
-}
-
-#[put("/users/{id}")]
-async fn update_user(db_pool: web::Data<PgPool>, id: web::Path<i32>, user: web::Json<UpdateUser>) -> impl Responder {
-    let user_id = id.into_inner();
-
-    let result = sqlx::query!(
-        "UPDATE users SET name = $1, email = $2 WHERE id = $3",
-        user.name,
-        user.email,
-        user_id
-    )
-    .execute(db_pool.get_ref())
-    .await;
+    let result = sqlx::query_as::<_, User>(query)
+        .bind(payload.name)
+        .bind(payload.email)
+        .fetch_one(&state.db_pool)
+        .await;
 
     match result {
-        Ok(result) => {
-            if result.rows_affected() == 0 {
-                return HttpResponse::NotFound().finish();
-            }
-            HttpResponse::NoContent().finish()
+        Ok(user) => {
+            info!("User created: {:?}", user);
+            Ok((StatusCode::CREATED, Json(user)))
         }
-        Err(e) => {
-            error!("Failed to update user: {}", e);
-            HttpResponse::InternalServerError().finish()
+        Err(err) => {
+            eprintln!("Error creating user: {:?}", err);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
 
-#[delete("/users/{id}")]
-async fn delete_user(db_pool: web::Data<PgPool>, id: web::Path<i32>) -> impl Responder {
-    let user_id = id.into_inner();
+async fn get_users(State(state): State<AppState>) -> Result<Json<Vec<User>>, StatusCode> {
+    let query = "SELECT id, name, email FROM users";
 
-    let result = sqlx::query!("DELETE FROM users WHERE id = $1", user_id)
-        .execute(db_pool.get_ref())
+    let result = sqlx::query_as::<_, User>(query).fetch_all(&state.db_pool).await;
+
+    match result {
+        Ok(users) => Ok(Json(users)),
+        Err(err) => {
+            eprintln!("Error getting users: {:?}", err);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+async fn get_user(
+    Path(id): Path<i32>,
+    State(state): State<AppState>,
+) -> Result<Json<User>, StatusCode> {
+    let query = "SELECT id, name, email FROM users WHERE id = $1";
+
+    let result = sqlx::query_as::<_, User>(query)
+        .bind(id)
+        .fetch_optional(&state.db_pool)
+        .await;
+
+    match result {
+        Ok(Some(user)) => Ok(Json(user)),
+        Ok(None) => Err(StatusCode::NOT_FOUND),
+        Err(err) => {
+            eprintln!("Error getting user: {:?}", err);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+async fn update_user(
+    Path(id): Path<i32>,
+    State(state): State<AppState>,
+    Json(payload): Json<CreateUser>,
+) -> Result<StatusCode, StatusCode> {
+    let query = "UPDATE users SET name = $1, email = $2 WHERE id = $3";
+
+    let result = sqlx::query(query)
+        .bind(payload.name)
+        .bind(payload.email)
+        .bind(id)
+        .execute(&state.db_pool)
         .await;
 
     match result {
         Ok(result) => {
-            if result.rows_affected() == 0 {
-                return HttpResponse::NotFound().finish();
+            if result.rows_affected() > 0 {
+                Ok(StatusCode::NO_CONTENT)
+            } else {
+                Err(StatusCode::NOT_FOUND)
             }
-            HttpResponse::NoContent().finish()
         }
-        Err(e) => {
-            error!("Failed to delete user: {}", e);
-            HttpResponse::InternalServerError().finish()
+        Err(err) => {
+            eprintln!("Error updating user: {:?}", err);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
+}
+
+async fn delete_user(
+    Path(id): Path<i32>,
+    State(state): State<AppState>,
+) -> Result<StatusCode, StatusCode> {
+    let query = "DELETE FROM users WHERE id = $1";
+
+    let result = sqlx::query(query).bind(id).execute(&state.db_pool).await;
+
+    match result {
+        Ok(result) => {
+            if result.rows_affected() > 0 {
+                Ok(StatusCode::NO_CONTENT)
+            } else {
+                Err(StatusCode::NOT_FOUND)
+            }
+        }
+        Err(err) => {
+            eprintln!("Error deleting user: {:?}", err);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
         }
     }
 }
@@ -173,38 +148,42 @@ async fn delete_user(db_pool: web::Data<PgPool>, id: web::Path<i32>) -> impl Res
 #[tokio::main]
 async fn main() -> Result<(), sqlx::Error> {
     dotenv().ok();
-    env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
+    tracing_subscriber::fmt::init();
 
-    let config = match AppConfig::from_env() {
-        Ok(config) => config,
-        Err(e) => {
-            eprintln!("Failed to read configuration from the environment: {}", e);
-            return Ok(());
-        }
-    };
+    let db_url = format!(
+        "postgres://{}:{}@{}:{}/{}",
+        env::var("DB_USER").unwrap_or("testuser".to_string()),
+        env::var("DB_PASSWORD").expect("DB_PASSWORD must be set"),
+        env::var("DB_HOST").unwrap_or("host.docker.internal".to_string()),
+        env::var("DB_PORT").unwrap_or("5432".to_string()),
+        env::var("DB_NAME").unwrap_or("complang".to_string()),
+    );
 
-    let db_pool = PgPool::connect(&config.database_url).await?;
+    let db_pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&db_url)
+        .await
+        .expect("Failed to create pool.");
 
-    sqlx::migrate!("./migrations").run(&db_pool).await?;
+    let state = AppState { db_pool };
 
-    let auth = HttpAuthentication::bearer(validator);
+    let app = Router::new()
+        .route("/users", post(create_user).get(get_users))
+        .route("/users/:id", get(get_user).put(update_user).delete(delete_user))
+        .with_state(state)
+        .layer(
+            CorsLayer::new()
+                .allow_origin(tower_http::cors::Any)
+                .allow_methods(tower_http::cors::Any)
+                .allow_headers(tower_http::cors::Any),
+        );
 
-    let port = config.port;
-    info!("Starting server on port: {}", port);
-
-    HttpServer::new(move || {
-        App::new()
-            .app_data(web::Data::new(db_pool.clone()))
-            .wrap(auth.clone())
-            .service(create_user)
-            .service(get_all_users)
-            .service(get_user)
-            .service(update_user)
-            .service(delete_user)
-    })
-    .bind(("0.0.0.0", port))?
-    .run()
-    .await?;
+    let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
+    info!("listening on {}", addr);
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
 
     Ok(())
 }

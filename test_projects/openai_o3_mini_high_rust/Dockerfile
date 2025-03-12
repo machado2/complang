@@ -1,26 +1,23 @@
-# Use a multi-stage build to compile the Rust application
-FROM rust:1.72 as builder
 
-WORKDIR /app
-# Copy Cargo.toml only (Cargo.lock is not available)
-COPY Cargo.toml .
+# syntax=docker/dockerfile:1
+FROM rust:1.68-slim AS builder
+WORKDIR /usr/src/complang_api
 
-# Create a dummy main.rs to allow dependency compilation caching
-RUN mkdir src
-RUN echo "fn main() {}" > src/main.rs
+# Copy Cargo.toml and generate Cargo.lock for caching dependencies.
+COPY Cargo.toml ./
+RUN cargo generate-lockfile
 
-# Build dependencies to cache them
+# Create a dummy main file to allow fetching dependencies.
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN cargo fetch
+
+# Copy the full source code and build the application in release mode.
+COPY src ./src
 RUN cargo build --release
 
-# Copy the full source code
-COPY . .
-
-# Build the actual application
-RUN cargo build --release
-
-# Runtime image
 FROM debian:buster-slim
-RUN apt-get update && apt-get install -y libssl1.1 ca-certificates && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /app/target/release/complang-api /usr/local/bin/complang-api
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+# Copy the built binary from the builder.
+COPY --from=builder /usr/src/complang_api/target/release/complang_api /usr/local/bin/complang_api
 EXPOSE 8080
-CMD ["/usr/local/bin/complang-api"]
+CMD ["complang_api"]

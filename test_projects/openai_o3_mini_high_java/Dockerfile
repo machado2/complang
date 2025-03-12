@@ -1,17 +1,13 @@
-# Stage 1: Build the application
-FROM maven:3.8.6-openjdk-11 AS build
+# Build stage
+FROM maven:3.8.5-openjdk-11 AS builder
 WORKDIR /app
-# Copy the Maven project file and download dependencies
 COPY pom.xml .
-RUN mvn dependency:go-offline -B
-# Copy the source code and build the project (skip tests for speed)
 COPY src ./src
-RUN mvn package -DskipTests
+RUN mvn clean package -DskipTests
 
-# Stage 2: Run the application
-FROM openjdk:11-jdk
+# Run stage
+FROM openjdk:11-jre-slim
 WORKDIR /app
-# Copy the jar from the build stage
-COPY --from=build /app/target/complang-0.0.1-SNAPSHOT.jar app.jar
+COPY --from=builder /app/target/crud-0.0.1-SNAPSHOT.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]

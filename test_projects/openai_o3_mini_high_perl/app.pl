@@ -4,88 +4,103 @@ use warnings;
 use Mojolicious::Lite;
 use DBI;
 
-# Retrieve the PostgreSQL password from environment variable
-my $pg_password = $ENV{"PGPASSWORD"} // "";
+# Ensure the PGPASSWORD environment variable is set
+my $db_password = $ENV{'PGPASSWORD'} // die "PGPASSWORD environment variable not set";
 
-# Connect to the PostgreSQL database
-my $dsn = "dbi:Pg:dbname=complang;host=host.docker.internal;port=5432";
-my $dbh = DBI->connect($dsn, "testuser", $pg_password, { RaiseError => 1, AutoCommit => 1 })
-    or die "Could not connect to database: $DBI::errstr";
+# Database connection configuration
+my $dsn = "DBI:Pg:dbname=complang;host=host.docker.internal;port=5432";
+my $db_username = "testuser";
 
-# Make the database handle available as a helper
+# Create a persistent database handle
+my $dbh = DBI->connect($dsn, $db_username, $db_password, {
+    RaiseError => 1,
+    AutoCommit => 1,
+}) or die $DBI::errstr;
+
+# Helper to access the DB handle from routes
 helper db => sub { return $dbh };
 
 # POST /users: Create a new user
-post "/users" => sub {
+post '/users' => sub {
     my $c = shift;
     my $data = $c->req->json;
-    unless ($data && $data->{name} && $data->{email}) {
-        return $c->render(json => { error => "Missing name or email" }, status => 400);
+    # Validate input
+    unless ($data && defined $data->{name} && defined $data->{email}) {
+        return $c->render(json => { error => 'Invalid input' }, status => 400);
     }
     my $name  = $data->{name};
     my $email = $data->{email};
-    my $sth = $c->app->db->prepare("INSERT INTO users (name, email) VALUES (?, ?) RETURNING id");
+    # Insert the user and return the new id using PostgreSQL RETURNING clause
+    my $sth = $dbh->prepare("INSERT INTO users (name, email) VALUES (?, ?) RETURNING id");
     $sth->execute($name, $email);
     my ($id) = $sth->fetchrow_array;
-    $c->render(json => { id => $id, name => $name, email => $email }, status => 201);
+    $sth->finish;
+    return $c->render(json => { id => $id, name => $name, email => $email }, status => 201);
 };
 
-# GET /users: Get list of all users
-get "/users" => sub {
+# GET /users: List all users
+get '/users' => sub {
     my $c = shift;
-    my $sth = $c->app->db->prepare("SELECT id, name, email FROM users");
+    my $sth = $dbh->prepare("SELECT id, name, email FROM users ORDER BY id");
     $sth->execute();
     my @users;
     while (my $row = $sth->fetchrow_hashref) {
         push @users, $row;
     }
-    $c->render(json => \@users, status => 200);
+    $sth->finish;
+    return $c->render(json => \@users, status => 200);
 };
 
-# GET /users/:id: Get a single user by id
-get "/users/:id" => sub {
-    my $c  = shift;
-    my $id = $c->param("id");
-    my $sth = $c->app->db->prepare("SELECT id, name, email FROM users WHERE id = ?");
+# GET /users/:id: Get a user by id
+get '/users/:id' => sub {
+    my $c = shift;
+    my $id = $c->stash('id');
+    my $sth = $dbh->prepare("SELECT id, name, email FROM users WHERE id = ?");
     $sth->execute($id);
-    if (my $user = $sth->fetchrow_hashref) {
-        $c->render(json => $user, status => 200);
+    my $user = $sth->fetchrow_hashref;
+    $sth->finish;
+    if ($user) {
+        return $c->render(json => $user, status => 200);
     } else {
-        $c->render(json => { error => "User not found" }, status => 404);
+        return $c->render(json => { error => "User not found" }, status => 404);
     }
 };
 
-# PUT /users/:id: Update a user
-put "/users/:id" => sub {
-    my $c  = shift;
-    my $id = $c->param("id");
+# PUT /users/:id: Update a user by id
+put '/users/:id' => sub {
+    my $c = shift;
+    my $id = $c->stash('id');
     my $data = $c->req->json;
-    unless ($data && $data->{name} && $data->{email}) {
-        return $c->render(json => { error => "Missing name or email" }, status => 400);
+    # Validate input
+    unless ($data && defined $data->{name} && defined $data->{email}) {
+        return $c->render(json => { error => 'Invalid input' }, status => 400);
     }
     my $name  = $data->{name};
     my $email = $data->{email};
-    my $sth = $c->app->db->prepare("UPDATE users SET name = ?, email = ? WHERE id = ?");
+    my $sth = $dbh->prepare("UPDATE users SET name = ?, email = ? WHERE id = ?");
     my $rows = $sth->execute($name, $email, $id);
+    $sth->finish;
     if ($rows && $rows > 0) {
-        $c->render(json => { success => 1 }, status => 200);
+        return $c->render(json => { id => int($id), name => $name, email => $email }, status => 200);
     } else {
-        $c->render(json => { error => "User not found" }, status => 404);
+        return $c->render(json => { error => "User not found" }, status => 404);
     }
 };
 
-# DELETE /users/:id: Delete a user
-del "/users/:id" => sub {
-    my $c  = shift;
-    my $id = $c->param("id");
-    my $sth = $c->app->db->prepare("DELETE FROM users WHERE id = ?");
+# DELETE /users/:id: Delete a user by id
+del '/users/:id' => sub {
+    my $c = shift;
+    my $id = $c->stash('id');
+    my $sth = $dbh->prepare("DELETE FROM users WHERE id = ?");
     my $rows = $sth->execute($id);
+    $sth->finish;
     if ($rows && $rows > 0) {
-        $c->render(json => { success => 1 }, status => 200);
+        # Return 204 No Content on success
+        return $c->render(status => 204, text => '');
     } else {
-        $c->render(json => { error => "User not found" }, status => 404);
+        return $c->render(json => { error => "User not found" }, status => 404);
     }
 };
 
-# Start the Mojolicious daemon listening on port 8080
-app->start("daemon", "-l", "http://*:8080");
+# Start the server on port 8080
+app->start('daemon', '-l', 'http://*:8080');

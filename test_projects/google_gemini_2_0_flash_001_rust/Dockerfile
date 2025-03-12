@@ -1,28 +1,38 @@
-
-FROM rust:1.81-slim-bookworm as builder
-
+FROM rust:1.81-slim-bookworm AS builder
 WORKDIR /app
 
-COPY Cargo.toml .
-RUN cargo build --release --target x86_64-unknown-linux-gnu
+# Install dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY src ./src
-COPY migrations ./migrations
-RUN cargo build --release --target x86_64-unknown-linux-gnu
+# Copy project files
+COPY . .
 
+# Build the application
+RUN cargo build --release
+
+# Create a minimal runtime image
 FROM debian:bookworm-slim
-
-RUN apt-get update && apt-get install -y --no-install-recommends libpq-dev openssl ca-certificates && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
 
-COPY --from=builder /app/target/x86_64-unknown-linux-gnu/release/rust_crud_api .
-COPY --from=builder /app/migrations ./migrations
+# Install required runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    openssl \
+    && rm -rf /var/lib/apt/lists/*
 
-ENV PGPASSWORD=Saloon5-Moody-Observing
-ENV DATABASE_URL=postgres://testuser:$PGPASSWORD@host.docker.internal:5432/complang
-ENV PORT=8080
+# Copy the built binary from the builder stage
+COPY --from=builder /app/target/release/rust_api .
 
+# Set environment variables
+ENV DB_HOST=host.docker.internal
+ENV DB_PORT=5432
+ENV DB_NAME=complang
+ENV DB_USER=testuser
+
+# Expose the port
 EXPOSE 8080
 
-CMD ["./rust_crud_api"]
+# Run the application
+CMD [ "./rust_api" ]

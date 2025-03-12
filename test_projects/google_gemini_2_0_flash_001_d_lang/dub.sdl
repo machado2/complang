@@ -1,0 +1,15 @@
+
+name "d_crud"
+description "A simple CRUD API in D"
+authors "You"
+copyright "Copyright © 2024, You"
+license "proprietary"
+dependency "vibe-d" version="~>0.9"
+dependency "vibe-d:postgres" version="*"
+
+configurations {
+    application {
+        targetType "executable"
+        mainSourceFile "app.d"
+    }
+}

@@ -1,2 +1,2 @@
 
-rootProject.name = "complang"
+rootProject.name = "kotlin-crud"

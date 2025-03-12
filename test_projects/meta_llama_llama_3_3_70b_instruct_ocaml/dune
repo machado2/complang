@@ -1,4 +1,0 @@
-
-(executable
-  (name crud_api)
-  (libraries lwt.cohttp lwt.unix pgocaml))

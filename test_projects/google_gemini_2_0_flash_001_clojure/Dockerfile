@@ -1,18 +1,17 @@
 
-FROM openjdk:17-slim
+FROM openjdk:17-jdk-slim
+
+RUN apt-get update && apt-get install -y leiningen
 
 WORKDIR /app
 
 COPY project.clj .
-RUN mkdir src
-COPY src ./src
-
-RUN apt-get update && apt-get install -y leiningen
-
 RUN lein deps
 
-RUN lein uberjar
+COPY src ./src
+
+RUN lein compile
 
 EXPOSE 8080
 
-CMD ["java", "-jar", "target/uberjar/complang-0.1.0-SNAPSHOT-standalone.jar"]
+CMD ["lein", "run"]

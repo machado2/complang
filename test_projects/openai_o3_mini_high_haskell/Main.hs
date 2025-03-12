@@ -1,103 +1,102 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-import Web.Scotty
-import Database.PostgreSQL.Simple
-import Database.PostgreSQL.Simple.FromRow
-import Data.Aeson (FromJSON, ToJSON, genericToJSON, genericParseJSON, defaultOptions, fieldLabelModifier)
-import GHC.Generics
+import Web.Scotty (scotty, ActionM, param, json, jsonData, status)
+import Database.PostgreSQL.Simple (connectPostgreSQL, query, query_, execute, Only(..))
+import Database.PostgreSQL.Simple.FromRow (FromRow, field, fromRow)
+import Data.Aeson (object, (.=), (.:), withObject, ToJSON, FromJSON)
+import qualified Data.ByteString.Char8 as BS
 import Control.Monad.IO.Class (liftIO)
+import GHC.Generics (Generic)
+import Data.Text (Text)
+import System.Environment (lookupEnv)
 import Network.HTTP.Types (status201, status204, status404)
-import System.Environment (getEnv)
 import Data.Int (Int64)
-import Data.Maybe (listToMaybe)
-import qualified Data.Text.Lazy as TL
 
--- | User record for output with custom JSON field names.
+-- Define the User type for output.
 data User = User
   { userId    :: Int
-  , userName  :: String
-  , userEmail :: String
+  , userName  :: Text
+  , userEmail :: Text
   } deriving (Show, Generic)
 
 instance ToJSON User where
-  toJSON = genericToJSON defaultOptions { fieldLabelModifier = \f ->
-      case f of
-        "userId"    -> "id"
-        "userName"  -> "name"
-        "userEmail" -> "email"
-        _           -> f
-    }
+  toJSON (User uid uname uemail) =
+    object [ "id"    .= uid
+           , "name"  .= uname
+           , "email" .= uemail
+           ]
 
 instance FromRow User where
   fromRow = User <$> field <*> field <*> field
 
--- | NewUser for incoming JSON data for POST/PUT requests.
+-- Define the NewUser type for input (create/update)
 data NewUser = NewUser
-  { newName  :: String
-  , newEmail :: String
+  { newUserName  :: Text
+  , newUserEmail :: Text
   } deriving (Show, Generic)
 
 instance FromJSON NewUser where
-  parseJSON = genericParseJSON defaultOptions { fieldLabelModifier = \f ->
-      case f of
-        "newName"  -> "name"
-        "newEmail" -> "email"
-        _          -> f
-    }
+  parseJSON = withObject "NewUser" $ \v ->
+    NewUser <$> v .: "name" <*> v .: "email"
 
 main :: IO ()
 main = do
-  pwd <- getEnv "PGPASSWORD"
-  let connInfo = defaultConnectInfo
-                   { connectHost     = "host.docker.internal",
-                     connectPort     = 5432,
-                     connectUser     = "testuser",
-                     connectPassword = pwd,
-                     connectDatabase = "complang"
-                   }
-  conn <- connect connInfo
+  -- Get password from PGPASSWORD env var.
+  mPassword <- lookupEnv "PGPASSWORD"
+  let password = maybe "" id mPassword
+  let connString = "host=host.docker.internal port=5432 dbname=complang user=testuser password=" ++ password
+  conn <- connectPostgreSQL (BS.pack connString)
   scotty 8080 $ do
     -- POST /users: Create a new user.
     post "/users" $ do
       newUser <- jsonData :: ActionM NewUser
-      res <- liftIO $ query conn
-               "INSERT INTO users (name, email) VALUES (?,?) RETURNING id"
-               (newName newUser, newEmail newUser) :: ActionM [Only Int]
-      case res of
-        [Only uid] -> do
+      result <- liftIO $ query conn "INSERT INTO users (name, email) VALUES (?,?) RETURNING id"
+                             (newUserName newUser, newUserEmail newUser) :: ActionM [Only Int]
+      case result of
+        [Only newId] -> do
+          let user = User newId (newUserName newUser) (newUserEmail newUser)
           status status201
-          json $ User uid (newName newUser) (newEmail newUser)
-        _ -> status status404
-
-    -- GET /users: List all users.
+          json user
+        _ -> do
+          status status404
+          json $ object ["error" .= ("Failed to create user" :: Text)]
+    
+    -- GET /users: Return all users.
     get "/users" $ do
       users <- liftIO $ query_ conn "SELECT id, name, email FROM users" :: ActionM [User]
       json users
 
-    -- GET /users/:id: Retrieve a single user.
+    -- GET /users/:id: Return a single user.
     get "/users/:id" $ do
       uid <- param "id"
-      users <- liftIO $ query conn
-                "SELECT id, name, email FROM users WHERE id = ?"
-                (Only uid) :: ActionM [User]
-      case users of
-        [] -> status status404
+      results <- liftIO $ query conn "SELECT id, name, email FROM users WHERE id = ?" (Only uid) :: ActionM [User]
+      case results of
+        [] -> do
+          status status404
+          json $ object ["error" .= ("User not found" :: Text)]
         (user:_) -> json user
 
-    -- PUT /users/:id: Update an existing user.
+    -- PUT /users/:id: Update a user.
     put "/users/:id" $ do
       uid <- param "id"
       newUser <- jsonData :: ActionM NewUser
-      updated <- liftIO $ execute conn
-                 "UPDATE users SET name = ?, email = ? WHERE id = ?"
-                 (newName newUser, newEmail newUser, uid)
-      if updated == 0 then status status404 else status status204
+      res <- liftIO $ execute conn "UPDATE users SET name = ?, email = ? WHERE id = ?"
+                           (newUserName newUser, newUserEmail newUser, uid) :: ActionM Int64
+      if res == 0
+        then do
+          status status404
+          json $ object ["error" .= ("User not found" :: Text)]
+        else do
+          let user = User uid (newUserName newUser) (newUserEmail newUser)
+          json user
 
     -- DELETE /users/:id: Delete a user.
     delete "/users/:id" $ do
       uid <- param "id"
-      removed <- liftIO $ execute conn
-                 "DELETE FROM users WHERE id = ?"
-                 (Only uid)
-      if removed == 0 then status status404 else status status204
+      res <- liftIO $ execute conn "DELETE FROM users WHERE id = ?" (Only uid) :: ActionM Int64
+      if res == 0
+        then do
+          status status404
+          json $ object ["error" .= ("User not found" :: Text)]
+        else status status204

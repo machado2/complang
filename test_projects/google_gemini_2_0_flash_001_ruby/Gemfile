@@ -1,7 +1,7 @@
-
 source 'https://rubygems.org'
 
 gem 'sinatra'
-gem 'activerecord'
+gem 'sinatra-contrib'
 gem 'pg'
-gem 'dotenv'
+gem 'rackup'
+gem 'puma'

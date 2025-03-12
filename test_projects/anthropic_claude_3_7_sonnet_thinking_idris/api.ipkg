@@ -1,0 +1,8 @@
+package api
+
+sourcedir = src
+modules = Main, DB, Routes, Types
+main = Main
+executable = api
+
+pkgs = contrib, network, effects, lightyear

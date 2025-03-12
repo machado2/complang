@@ -1,22 +1,23 @@
-FROM openjdk:11-jdk-slim
 
-WORKDIR /app
+FROM openjdk:8-jdk-slim
 
-COPY build.sbt .
-COPY project ./project
-
-RUN apt-get update && apt-get install -y --no-install-recommends apt-transport-https
-RUN apt-get update && apt-get install -y gnupg
+# Install sbt
+RUN apt-get update
+RUN apt-get install -y apt-transport-https curl gnupg
 RUN echo "deb https://repo.scala-sbt.org/scalasbt/debian all main" | tee /etc/apt/sources.list.d/sbt.list
-RUN echo "deb https://repo.scala-sbt.org/scalasbt/debian /" | tee /etc/apt/sources.list.d/sbt_new.list
-RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 2EE0EA64E40A89B84B2DF73499E82A75642AC823
+RUN echo "deb https://repo.scala-sbt.org/scalasbt/debian /" | tee /etc/apt/sources.list.d/sbt_extras.list
+RUN curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2669E30526BA9F" | apt-key add
 RUN apt-get update
 RUN apt-get install -y sbt
 
-COPY src ./src
+# Set working directory
+WORKDIR /app
 
-RUN sbt assembly
+# Copy source code
+COPY . /app
 
+# Expose port
 EXPOSE 8080
 
-CMD ["java", "-jar", "target/scala-2.13/scala-crud-assembly-1.0.jar"]
+# Run the application
+CMD ["sbt", "run"]

@@ -1,18 +1,16 @@
-# Use the official D language image with the LDC compiler.
-FROM dlang/ldc:latest
-
-# Set the working directory.
+# Stage 1: Build stage using Ubuntu and install DMD and Dub
+FROM ubuntu:22.04 AS builder
+RUN apt-get update && apt-get install -y wget tar unzip build-essential libcurl4-openssl-dev libpq-dev
+RUN wget -qO- https://dlang.org/install.sh | bash -s dmd
+ENV PATH="/root/dlang/dmd2/linux/bin64:${PATH}"
 WORKDIR /app
+COPY . .
+RUN dub build --build=release
 
-# Copy project files.
-COPY dub.json .
-COPY source/ source/
-
-# Build the project in release mode.
-RUN dub build --build=release -b ldc2
-
-# Expose port 8080.
+# Stage 2: Runtime stage - minimal Ubuntu image with libpq
+FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y libpq5
+WORKDIR /app
+COPY --from=builder /app/complang_api .
 EXPOSE 8080
-
-# Run the compiled binary.
-CMD ["./crud-api"]
+CMD ["./complang_api"]

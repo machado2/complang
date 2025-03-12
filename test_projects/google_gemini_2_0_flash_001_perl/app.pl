@@ -1,146 +1,139 @@
 
-#!/usr/bin/env perl
-
 use Mojolicious::Lite;
 use DBI;
-use Encode qw(decode encode);
-use Data::Dumper;
+use JSON;
 
-# Read password from environment variable
-my $pg_password = $ENV{PGPASSWORD} || die "PGPASSWORD environment variable not set";
+# Database configuration
+my $host     = 'host.docker.internal';
+my $port     = 5432;
+my $database = 'complang';
+my $user     = 'testuser';
+my $password = $ENV{PGPASSWORD}; # Read password from environment variable
 
-# Database connection
-my $dbh = DBI->connect("dbi:Pg:dbname=complang;host=host.docker.internal;port=5432", "testuser", $pg_password, { RaiseError => 1, AutoCommit => 1 });
+# Construct the connection string
+my $dsn = "dbi:Pg:dbname=$database;host=$host;port=$port";
+
+# Helper function to connect to the database
+sub db_connect {
+    my $dbh = DBI->connect($dsn, $user, $password, { RaiseError => 1, AutoCommit => 0 });
+    return $dbh;
+}
+
+# before_route hook to handle common tasks (e.g., JSON parsing)
+hook before_route => sub {
+    my $c = shift;
+    if ($c->req->is_json) {
+        my $json = decode_json $c->req->body;
+        $c->stash(json => $json);
+    }
+};
 
 
-# Helper function to fetch all users
-sub get_all_users {
-    my $sql = "SELECT id, name, email FROM users";
-    my $sth = $dbh->prepare($sql);
+# GET /users: Returns a list of all users
+get '/users' => sub {
+    my $c = shift;
+    my $dbh = db_connect();
+    my $sth = $dbh->prepare('SELECT id, name, email FROM users');
     $sth->execute();
+
     my @users;
     while (my $row = $sth->fetchrow_hashref()) {
         push @users, $row;
     }
+
     $sth->finish();
-    return \@users;
-}
+    $dbh->disconnect();
 
-# Helper function to fetch a single user by ID
-sub get_user {
-    my ($id) = @_;
-    my $sql = "SELECT id, name, email FROM users WHERE id = ?";
-    my $sth = $dbh->prepare($sql);
-    $sth->execute($id);
-    my $user = $sth->fetchrow_hashref();
-    $sth->finish();
-    return $user;
-}
-
-# Helper function to create a user
-sub create_user {
-    my ($name, $email) = @_;
-    my $sql = "INSERT INTO users (name, email) VALUES (?, ?) RETURNING id";
-    my $sth = $dbh->prepare($sql);
-    $sth->execute($name, $email);
-    my $id = $sth->fetchrow_arrayref()->[0];
-    $sth->finish();
-    return $id;
-}
-
-# Helper function to update a user
-sub update_user {
-    my ($id, $name, $email) = @_;
-    my $sql = "UPDATE users SET name = ?, email = ? WHERE id = ?";
-    my $sth = $dbh->prepare($sql);
-    $sth->execute($name, $email, $id);
-    my $rows_affected = $sth->rows;
-    $sth->finish();
-    return $rows_affected;
-}
-
-# Helper function to delete a user
-sub delete_user {
-    my ($id) = @_;
-    my $sql = "DELETE FROM users WHERE id = ?";
-    my $sth = $dbh->prepare($sql);
-    $sth->execute($id);
-    my $rows_affected = $sth->rows;
-    $sth->finish();
-    return $rows_affected;
-}
-
-# Route for creating a user (POST /users)
-post '/users' => sub {
-    my $self = shift;
-    my $json = $self->req->json;
-    my $name = $json->{name};
-    my $email = $json->{email};
-
-    if (not defined $name || not defined $email) {
-        return $self->render_json({ error => "Missing name or email" }, { status => 400 });
-    }
-
-    my $id = create_user($name, $email);
-
-    my $user = { id => $id, name => $name, email => $email };
-    return $self->render_json($user, { status => 201 });
+    $c->render(json => \@users);
 };
 
-# Route for listing all users (GET /users)
-get '/users' => sub {
-    my $self = shift;
-    my $users = get_all_users();
-    return $self->render_json($users);
-};
-
-# Route for getting a single user (GET /users/:id)
+# GET /users/{id}: Returns a single user
 get '/users/:id' => sub {
-    my $self = shift;
-    my $id = $self->param('id');
-    my $user = get_user($id);
+    my $c = shift;
+    my $id = $c->param('id');
+
+    my $dbh = db_connect();
+    my $sth = $dbh->prepare('SELECT id, name, email FROM users WHERE id = ?');
+    $sth->execute($id);
+
+    my $user = $sth->fetchrow_hashref();
+
+    $sth->finish();
+    $dbh->disconnect();
 
     if ($user) {
-        return $self->render_json($user);
+        $c->render(json => $user);
     } else {
-        return $self->render_json({ error => "User not found" }, { status => 404 });
+        $c->render(status => 404, json => { error => 'User not found' });
     }
 };
 
-# Route for updating a user (PUT /users/:id)
-put '/users/:id' => sub {
-    my $self = shift;
-    my $id = $self->param('id');
-    my $json = $self->req->json;
-    my $name = $json->{name};
+# POST /users: Creates a new user
+post '/users' => sub {
+    my $c = shift;
+    my $json = $c->stash('json');
+
+    my $name  = $json->{name};
     my $email = $json->{email};
 
-   if (not defined $name || not defined $email) {
-        return $self->render_json({ error => "Missing name or email" }, { status => 400 });
-    }
+    my $dbh = db_connect();
+    my $sth = $dbh->prepare('INSERT INTO users (name, email) VALUES (?, ?) RETURNING id, name, email');
+    $sth->execute($name, $email);
 
-    my $rows_affected = update_user($id, $name, $email);
+    my $new_user = $sth->fetchrow_hashref();
+    $dbh->commit();
+
+    $sth->finish();
+    $dbh->disconnect();
+
+    $c->render(status => 201, json => $new_user);
+};
+
+# PUT /users/{id}: Updates an existing user
+put '/users/:id' => sub {
+    my $c = shift;
+    my $id   = $c->param('id');
+    my $json = $c->stash('json');
+
+    my $name  = $json->{name};
+    my $email = $json->{email};
+
+    my $dbh = db_connect();
+    my $sth = $dbh->prepare('UPDATE users SET name = ?, email = ? WHERE id = ?');
+    $sth->execute($name, $email, $id);
+
+    my $rows_affected = $sth->rows;
+    $dbh->commit();
+
+    $sth->finish();
+    $dbh->disconnect();
 
     if ($rows_affected > 0) {
-      $self->res->code(204);
-      return $self->render_json({});
+        $c->render(status => 204);
     } else {
-        return $self->render_json({ error => "User not found" }, { status => 404 });
+        $c->render(status => 404, json => { error => 'User not found' });
     }
 };
 
-# Route for deleting a user (DELETE /users/:id)
-del '/users/:id' => sub {
-    my $self = shift;
-    my $id = $self->param('id');
-    my $rows_affected = delete_user($id);
+# DELETE /users/{id}: Deletes an existing user
+delete '/users/:id' => sub {
+    my $c = shift;
+    my $id = $c->param('id');
+
+    my $dbh = db_connect();
+    my $sth = $dbh->prepare('DELETE FROM users WHERE id = ?');
+    $sth->execute($id);
+
+    my $rows_affected = $sth->rows;
+    $dbh->commit();
+
+    $sth->finish();
+    $dbh->disconnect();
 
     if ($rows_affected > 0) {
-        $self->res->code(204);
-        return $self->render_json({});
-
+        $c->render(status => 204);
     } else {
-        return $self->render_json({ error => "User not found" }, { status => 404 });
+        $c->render(status => 404, json => { error => 'User not found' });
     }
 };
 

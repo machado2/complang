@@ -2,17 +2,13 @@
 {
   "name": "crud-api",
   "version": "1.0.0",
-  "description": "CRUD API with PostgreSQL",
-  "main": "app.js",
+  "description": "A simple CRUD API",
+  "main": "index.js",
   "scripts": {
-    "start": "node app.js"
+    "start": "node index.js"
   },
   "dependencies": {
     "express": "^4.17.1",
-    "pg": "^8.7.1",
-    "dotenv": "^16.0.0"
-  },
-  "devDependencies": {
-    "nodemon": "^2.0.15"
+    "pg": "^8.7.1"
   }
 }

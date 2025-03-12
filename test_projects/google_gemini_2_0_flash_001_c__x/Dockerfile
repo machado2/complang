@@ -1,18 +1,32 @@
 
-FROM ubuntu:22.04
+FROM ubuntu:latest
 
-RUN apt-get update && apt-get install -y     g++     libpq-dev     libboost-dev     libboost-system-dev     libboost-thread-dev     libcurl4-openssl-dev     cmake
+# Set environment variables
+ENV PGPASSWORD=Saloon5-Moody-Observing
 
-# Install cpprestsdk (Casablanca)
-RUN apt-get install -y libcpprest-dev
+# Install dependencies
+RUN apt-get update && apt-get install -y     build-essential     cmake     git     libpq-dev     wget     libboost-dev     libboost-system-dev     libboost-filesystem-dev     curl
 
+# Download and install cpprestsdk - using latest release if v2.10.18 not working
+RUN CPP_REST_VERSION="v2.10.19" && \
+    git clone --depth 1 -b ${CPP_REST_VERSION} https://github.com/microsoft/cpprestsdk.git && \
+    mkdir cpprestsdk/build && \
+    cd cpprestsdk/build && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr && \
+    make -j$(nproc) && \
+    make install && \
+    cd / && \
+    rm -rf cpprestsdk
+
+# Clone the project repository (assuming it's in the same directory)
+RUN git clone . /app
+
+# Build the application
 WORKDIR /app
-COPY . /app
+RUN g++ -std=c++17 -o crud_api main.cpp db.cpp user.cpp -lpq -lcpprest -pthread
 
-RUN mkdir build
-WORKDIR /app/build
-RUN cmake ..
-RUN make
-
+# Expose port
 EXPOSE 8080
-CMD ["./user_api"]
+
+# Run the application
+CMD ["./crud_api"]

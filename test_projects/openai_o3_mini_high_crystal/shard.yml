@@ -1,0 +1,14 @@
+
+name: users_api
+version: 0.1.0
+authors:
+  - Your Name <you@example.com>
+crystal: 1.0.0
+
+dependencies:
+  kemal:
+    github: kemalcr/kemal
+    version: "~> 0.26.0"
+  pg:
+    github: will/crystal-pg
+    version: "~> 0.21.0"

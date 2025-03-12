@@ -1,0 +1,11 @@
+package = crud-api
+
+main = Main
+
+version = 0.1
+
+depends =
+  contrib
+  palmer-http
+  palmer-json
+  idris-postgres

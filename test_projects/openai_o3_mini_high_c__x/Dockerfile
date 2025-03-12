@@ -1,17 +1,10 @@
-FROM gcc:10
-
-RUN apt-get update && apt-get install -y libpq-dev libpqxx-dev git
-
+FROM ubuntu:20.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y g++ make wget libpqxx-dev libpq-dev
 WORKDIR /app
-
-COPY main.cpp .
-
-# Clone the ipkn/crow repository and copy the crow_all.h header
-RUN git clone --depth 1 https://github.com/ipkn/crow.git && cp crow/include/crow_all.h .
-
-# Build the application
-RUN g++ -O2 -std=c++17 main.cpp -o app -lpqxx -lpq -pthread
-
+# Download the Crow framework header from an alternative URL
+RUN wget -O crow_all.h https://raw.githubusercontent.com/ipkn/crow/master/include/crow_all.h
+COPY main.cpp /app/main.cpp
+RUN g++ -std=c++17 main.cpp -lpqxx -lpq -o app
 EXPOSE 8080
-
 CMD ["./app"]

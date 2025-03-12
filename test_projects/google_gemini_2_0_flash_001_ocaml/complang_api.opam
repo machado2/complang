@@ -1,0 +1,22 @@
+opam-version: "2.0"
+name: "complang_api"
+version: "0.1.0"
+synopsis: "CRUD API in OCaml"
+description: "A simple CRUD API for managing users, written in OCaml."
+maintainer: "Your Name"
+authors: ["Your Name"]
+license: "MIT"
+depends: [
+  "ocaml" {>= "4.14"}
+  "dune" {>= "3.0"}
+  "yojson" {>= "2.0"}
+  "lwt" {>= "5.0"}
+  "dream" {>= "1.0"}
+  "postgresql"
+]
+build: [
+  ["dune" "build" "-p" name "-j" jobs]
+]
+install: [
+  ["dune" "install" "-p" name]
+]

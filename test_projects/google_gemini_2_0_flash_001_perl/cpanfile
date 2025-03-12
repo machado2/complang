@@ -1,0 +1,9 @@
+
+requires 'Mojolicious', '9.27';
+requires 'DBI';
+requires 'DBD::Pg';
+requires 'Data::Dumper';
+requires 'Mojo::JSON';
+requires 'Encode';
+
+test_requires 'Test::More';

@@ -1,15 +1,12 @@
 
-FROM golang:1.21-alpine AS builder
+FROM golang:1.20-alpine AS builder
 
 WORKDIR /app
 
-RUN go mod init example.com/users
+RUN go mod init complang
 COPY go.mod ./
 RUN go mod download
-RUN go mod tidy
-
 COPY . .
-
 RUN go build -o main .
 
 FROM alpine:latest

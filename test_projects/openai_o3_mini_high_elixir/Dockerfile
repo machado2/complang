@@ -1,1 +1,23 @@
-# Use the official Elixir image (Alpine-based for a smaller footprint)\nFROM elixir:1.11-alpine\n\n# Install build dependencies\nRUN apk add --no-cache build-base npm git\n\nWORKDIR /app\n\n# Copy mix files and get dependencies\nCOPY mix.exs mix.lock ./\nRUN mix local.rebar --force\nRUN mix local.hex --force && mix deps.get && mix deps.compile\n\n# Copy configuration and source code\nCOPY config config\nCOPY lib lib\n\n# Compile the project\nRUN mix compile\n\n# Expose port 8080\nEXPOSE 8080\n\nCMD ["mix", "run", "--no-halt"]\n
+
+FROM elixir:1.12-alpine
+
+# Install build dependencies
+RUN apk update && apk add --no-cache build-base npm git
+
+WORKDIR /app
+
+# Copy mix.exs and configuration; mix.lock is not copied as it will be generated during build
+COPY mix.exs ./
+COPY config config/
+RUN mix local.hex --force && mix local.rebar --force
+RUN mix deps.get
+
+# Copy the rest of the application
+COPY . .
+
+# Compile the project in prod mode
+RUN MIX_ENV=prod mix compile
+
+EXPOSE 8080
+
+CMD ["mix", "run", "--no-halt"]

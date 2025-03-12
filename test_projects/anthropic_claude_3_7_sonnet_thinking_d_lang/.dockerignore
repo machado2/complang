@@ -1,0 +1,11 @@
+
+.git
+.gitignore
+.dub
+dub.selections.json
+*.o
+*.obj
+*.a
+*.lib
+*.exe
+*.dll

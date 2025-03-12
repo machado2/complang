@@ -1,7 +1,9 @@
 FROM rakudo-star
-RUN apt-get update && apt-get install -y libssl-dev
-RUN zef install Cro::HTTP::Router DBIish JSON::Fast --/test
 WORKDIR /app
-COPY . .
+COPY app.raku .
+# Install required modules
+RUN zef install Cro
+RUN zef install DBIish
+RUN zef install JSON::Fast
 EXPOSE 8080
 CMD ["raku", "app.raku"]

@@ -1,13 +1,17 @@
-FROM haskell:8.4
+
+FROM haskell:latest
 
 WORKDIR /app
 
-COPY . .
-
+COPY haskell-crud.cabal .
 RUN cabal update
 RUN cabal install --only-dependencies
+
+COPY app app
+COPY Database.hs .
+
 RUN cabal build
 
 EXPOSE 8080
 
-CMD ["dist/build/complang/complang"]
+CMD ["cabal", "run", "haskell-crud"]

@@ -1,168 +1,153 @@
 #include "crow_all.h"
 #include <pqxx/pqxx>
+#include <sstream>
 #include <cstdlib>
-#include <string>
-#include <exception>
+#include <iostream>
 
-int main() {
+// Helper: Build PostgreSQL connection string using PGPASSWORD env variable.
+std::string get_db_connection_string() {
+    const char* pgpwd = std::getenv("PGPASSWORD");
+    std::string pwd = pgpwd ? pgpwd : "";
+    std::ostringstream conn;
+    conn << "host=host.docker.internal port=5432 dbname=complang user=testuser password=" << pwd;
+    return conn.str();
+}
+
+int main()
+{
     crow::SimpleApp app;
 
-    // POST /users: Create a new user
-    CROW_ROUTE(app, "/users").methods(crow::HTTPMethod::POST)([](const crow::request& req) -> crow::response {
+    // POST /users: Create a new user.
+    CROW_ROUTE(app, "/users").methods("POST"_method)([](const crow::request& req){
+        auto body = crow::json::load(req.body);
+        if (!body) {
+            return crow::response(400, "Invalid JSON");
+        }
+        if (!body.has("name") || !body.has("email")) {
+            return crow::response(400, "Missing name or email");
+        }
+        std::string name = body["name"].s();
+        std::string email = body["email"].s();
+        std::string conn_str = get_db_connection_string();
         try {
-            auto body = crow::json::load(req.body);
-            if (!body)
-                return crow::response(400, "Invalid JSON");
-            if (!body.has("name") || !body.has("email"))
-                return crow::response(400, "Missing name or email");
-
-            std::string name = body["name"].s();
-            std::string email = body["email"].s();
-
-            const char* pg_pass = std::getenv("PGPASSWORD");
-            if (!pg_pass)
-                return crow::response(500, "Missing PGPASSWORD env variable");
-
-            std::string conn_str = "host=host.docker.internal port=5432 dbname=complang user=testuser password=";
-            conn_str += pg_pass;
             pqxx::connection conn(conn_str);
-            if (!conn.is_open())
-                return crow::response(500, "Could not open DB connection");
-
             pqxx::work txn(conn);
-            std::string query = "INSERT INTO users (name, email) VALUES (" + txn.quote(name) + ", " + txn.quote(email) + ") RETURNING id";
-            pqxx::result res = txn.exec(query);
+            std::ostringstream query;
+            query << "INSERT INTO users(name, email) VALUES(" 
+                  << txn.quote(name) << ", " 
+                  << txn.quote(email) 
+                  << ") RETURNING id;";
+            pqxx::result r = txn.exec(query.str());
             txn.commit();
-
-            if (res.size() != 1)
-                return crow::response(500, "Insertion failed");
-
-            int id = res[0][0].as<int>();
-
-            crow::json::wvalue ret;
-            ret["id"] = id;
-            ret["name"] = name;
-            ret["email"] = email;
-            crow::response response(ret);
-            response.code = 201;
-            return response;
-        } catch (std::exception &e) {
-            return crow::response(500, std::string("Exception: ") + e.what());
+            if (r.size() > 0) {
+                int id = r[0][0].as<int>();
+                crow::json::wvalue resp_body;
+                resp_body["id"] = id;
+                resp_body["name"] = name;
+                resp_body["email"] = email;
+                crow::response resp(201);
+                resp.write(resp_body.dump());
+                return resp;
+            }
+            return crow::response(500, "Failed to create user");
+        } catch (const std::exception &e) {
+            return crow::response(500, e.what());
         }
     });
 
-    // GET /users: Retrieve all users
-    CROW_ROUTE(app, "/users").methods(crow::HTTPMethod::GET)([]() -> crow::response {
+    // GET /users: Retrieve all users.
+    CROW_ROUTE(app, "/users").methods("GET"_method)([](){
+        std::string conn_str = get_db_connection_string();
         try {
-            const char* pg_pass = std::getenv("PGPASSWORD");
-            if (!pg_pass)
-                return crow::response(500, "Missing PGPASSWORD env variable");
-            std::string conn_str = "host=host.docker.internal port=5432 dbname=complang user=testuser password=";
-            conn_str += pg_pass;
             pqxx::connection conn(conn_str);
-            if (!conn.is_open())
-                return crow::response(500, "Could not open DB connection");
             pqxx::work txn(conn);
-            pqxx::result res = txn.exec("SELECT id, name, email FROM users ORDER BY id");
-            txn.commit();
-
-            crow::json::wvalue ret;
-            for (size_t i = 0; i < res.size(); ++i) {
+            pqxx::result r = txn.exec("SELECT id, name, email FROM users;");
+            crow::json::wvalue resp_body = crow::json::wvalue::list();
+            for (const auto &row : r) {
                 crow::json::wvalue user;
-                user["id"] = res[i][0].as<int>();
-                user["name"] = res[i][1].as<std::string>();
-                user["email"] = res[i][2].as<std::string>();
-                ret[i] = user;
+                user["id"] = row[0].as<int>();
+                user["name"] = row[1].c_str();
+                user["email"] = row[2].c_str();
+                resp_body.push_back(user);
             }
-            return crow::response(ret);
-        } catch (std::exception &e) {
-            return crow::response(500, std::string("Exception: ") + e.what());
+            return crow::response(200, resp_body.dump());
+        } catch (const std::exception &e) {
+            return crow::response(500, e.what());
         }
     });
 
-    // GET /users/<id>: Retrieve a user by id
-    CROW_ROUTE(app, "/users/<int>").methods(crow::HTTPMethod::GET)([](int id) -> crow::response {
+    // GET /users/{id}: Retrieve a single user.
+    CROW_ROUTE(app, "/users/<int>").methods("GET"_method)([](int id){
+        std::string conn_str = get_db_connection_string();
         try {
-            const char* pg_pass = std::getenv("PGPASSWORD");
-            if (!pg_pass)
-                return crow::response(500, "Missing PGPASSWORD env variable");
-            std::string conn_str = "host=host.docker.internal port=5432 dbname=complang user=testuser password=";
-            conn_str += pg_pass;
             pqxx::connection conn(conn_str);
-            if (!conn.is_open())
-                return crow::response(500, "Could not open DB connection");
             pqxx::work txn(conn);
-            std::string query = "SELECT id, name, email FROM users WHERE id = " + txn.quote(id);
-            pqxx::result res = txn.exec(query);
-            txn.commit();
-            if (res.empty())
+            std::ostringstream query;
+            query << "SELECT id, name, email FROM users WHERE id = " << id << ";";
+            pqxx::result r = txn.exec(query.str());
+            if (r.size() == 0) {
                 return crow::response(404, "User not found");
-
-            crow::json::wvalue ret;
-            ret["id"] = res[0][0].as<int>();
-            ret["name"] = res[0][1].as<std::string>();
-            ret["email"] = res[0][2].as<std::string>();
-            return crow::response(ret);
-        } catch (std::exception &e) {
-            return crow::response(500, std::string("Exception: ") + e.what());
+            }
+            crow::json::wvalue user;
+            user["id"] = r[0][0].as<int>();
+            user["name"] = r[0][1].c_str();
+            user["email"] = r[0][2].c_str();
+            return crow::response(200, user.dump());
+        } catch (const std::exception &e) {
+            return crow::response(500, e.what());
         }
     });
 
-    // PUT /users/<id>: Update a user
-    CROW_ROUTE(app, "/users/<int>").methods(crow::HTTPMethod::PUT)([](int id, const crow::request &req) -> crow::response {
+    // PUT /users/{id}: Update an existing user.
+    CROW_ROUTE(app, "/users/<int>").methods("PUT"_method)([](const crow::request& req, int id){
+        auto body = crow::json::load(req.body);
+        if (!body) {
+            return crow::response(400, "Invalid JSON");
+        }
+        if (!body.has("name") || !body.has("email")) {
+            return crow::response(400, "Missing name or email");
+        }
+        std::string name = body["name"].s();
+        std::string email = body["email"].s();
+        std::string conn_str = get_db_connection_string();
         try {
-            auto body = crow::json::load(req.body);
-            if (!body)
-                return crow::response(400, "Invalid JSON");
-            if (!body.has("name") || !body.has("email"))
-                return crow::response(400, "Missing name or email");
-
-            std::string name = body["name"].s();
-            std::string email = body["email"].s();
-            const char* pg_pass = std::getenv("PGPASSWORD");
-            if (!pg_pass)
-                return crow::response(500, "Missing PGPASSWORD env variable");
-            std::string conn_str = "host=host.docker.internal port=5432 dbname=complang user=testuser password=";
-            conn_str += pg_pass;
             pqxx::connection conn(conn_str);
-            if (!conn.is_open())
-                return crow::response(500, "Could not open DB connection");
             pqxx::work txn(conn);
-            std::string query = "UPDATE users SET name = " + txn.quote(name) + ", email = " + txn.quote(email) + " WHERE id = " + txn.quote(id) + " RETURNING id";
-            pqxx::result res = txn.exec(query);
-            if (res.empty()) {
-                txn.abort();
+            std::ostringstream query;
+            query << "UPDATE users SET name = " << txn.quote(name)
+                  << ", email = " << txn.quote(email)
+                  << " WHERE id = " << id << " RETURNING id;";
+            pqxx::result r = txn.exec(query.str());
+            txn.commit();
+            if (r.size() == 0) {
                 return crow::response(404, "User not found");
             }
-            txn.commit();
-            return crow::response(200);
-        } catch (std::exception &e) {
-            return crow::response(500, std::string("Exception: ") + e.what());
+            crow::json::wvalue user;
+            user["id"] = id;
+            user["name"] = name;
+            user["email"] = email;
+            return crow::response(200, user.dump());
+        } catch (const std::exception &e) {
+            return crow::response(500, e.what());
         }
     });
 
-    // DELETE /users/<id>: Delete a user
-    CROW_ROUTE(app, "/users/<int>").methods(crow::HTTPMethod::DELETE)([](int id) -> crow::response {
+    // DELETE /users/{id}: Delete a user.
+    CROW_ROUTE(app, "/users/<int>").methods("DELETE"_method)([](int id){
+        std::string conn_str = get_db_connection_string();
         try {
-            const char* pg_pass = std::getenv("PGPASSWORD");
-            if (!pg_pass)
-                return crow::response(500, "Missing PGPASSWORD env variable");
-            std::string conn_str = "host=host.docker.internal port=5432 dbname=complang user=testuser password=";
-            conn_str += pg_pass;
             pqxx::connection conn(conn_str);
-            if (!conn.is_open())
-                return crow::response(500, "Could not open DB connection");
             pqxx::work txn(conn);
-            std::string query = "DELETE FROM users WHERE id = " + txn.quote(id) + " RETURNING id";
-            pqxx::result res = txn.exec(query);
-            if (res.empty()) {
-                txn.abort();
+            std::ostringstream query;
+            query << "DELETE FROM users WHERE id = " << id << " RETURNING id;";
+            pqxx::result r = txn.exec(query.str());
+            txn.commit();
+            if (r.size() == 0) {
                 return crow::response(404, "User not found");
             }
-            txn.commit();
-            return crow::response(200);
-        } catch (std::exception &e) {
-            return crow::response(500, std::string("Exception: ") + e.what());
+            return crow::response(204);
+        } catch (const std::exception &e) {
+            return crow::response(500, e.what());
         }
     });
 

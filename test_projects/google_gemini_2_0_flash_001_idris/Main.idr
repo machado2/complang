@@ -1,153 +1,197 @@
-
 module Main
 
-import Effects
-import Effects.Exception
+import Data.String
 import Data.List
 import Data.Maybe
+import System
+import System.Environment
+import TCP
+import Network.Socket
+import Palmer.HTTP
+import Palmer.HTTP.Types
+import Palmer.HTTP.Router
+import Palmer.HTTP.Server
+import Palmer.HTTP.Response
+import Palmer.JSON
+import Palmer.JSON.Decode
+import Palmer.JSON.Encode
+import Database.PostgreSQL
 
-%language ElabReflection
+%default total
 
--- Placeholder for database interaction library
--- Assuming a library with functions like:
--- dbConnect : String -> String -> String -> String -> IO DBConnection
--- dbQuery : DBConnection -> String -> IO (List (List String))
--- dbExecute : DBConnection -> String -> String -> IO ()
--- dbClose : DBConnection -> IO ()
+-- Data Models
+record User where
+  constructor MkUser
+  id    : Int
+  name  : String
+  email : String
 
--- Placeholder for web framework library
--- Assuming a library with functions like:
--- startServer : Int -> (HTTPRequest -> IO HTTPResponse) -> IO ()
--- HTTPRequest : Type
--- HTTPResponse : Type
--- JSON : Type
--- jsonEncode : JSON -> String
--- jsonDecode : String -> Maybe JSON
+-- JSON Instances
+JSONValue User where
+  toJSON (MkUser id name email) =
+    JObject [ ("id",    toJSON id)
+            , ("name",  toJSON name)
+            , ("email", toJSON email) ]
 
--- Types
-data User = User { id : Int, name : String, email : String }
+-- Decode the JSON
+fromJSON : JSONValue -> Maybe User
+fromJSON (JObject obj) = do
+  id    <- fromJSON =<< lookup "id"    obj
+  name  <- fromJSON =<< lookup "name"  obj
+  email <- fromJSON =<< lookup "email" obj
+  pure $ MkUser id name email
+fromJSON _ = Nothing
 
--- Convert a database row to a User
-rowToUser : List String -> Maybe User
-rowToUser [id, name, email] = Just (User (stringToInteger id) name email)
-rowToUser _ = Nothing
+-- Database Configuration
+dbHost     : String
+dbHost     = "host.docker.internal"
 
--- Database connection parameters (read from environment variables)
-dbHost : String
-dbHost = "host.docker.internal"
+dbPort     : String
+dbPort     = "5432"
 
-dbPort : String
-dbPort = "5432"
+dbName     : String
+dbName     = "complang"
 
-dbName : String
-dbName = "complang"
+dbUser     : String
+dbUser     = "testuser"
 
-dbUser : String
-dbUser = "testuser"
+-- NOTE: password needs to be set in the env variable PGPASSWORD
+-- dbPassword : String
+-- dbPassword = "Saloon5-Moody-Observing"
 
-dbPassword : IO String
-dbPassword = getEnv "PGPASSWORD"
+-- Helper function to get the password from the environment
+getDbPassword : IO String
+getDbPassword = getEnv "PGPASSWORD" `catch` \(me : IOError) => pure ""
 
--- Helper function to convert String to Int safely
-stringToInteger : String -> String -> Int
-stringToInteger str def = defaultTo 0 (parseInteger str)
+-- Database connection string
+getConnectionString : String -> String
+getConnectionString password =
+  "host=" ++ dbHost ++ " port=" ++ dbPort ++ " dbname=" ++ dbName ++ " user=" ++ dbUser ++ " password=" ++ password
 
--- | Get all users
-getUsers : IO (List User)
-getUsers = do
-  pwd <- dbPassword
-  -- Placeholder for database connection
-  let connStr = "host=" ++ dbHost ++ " port=" ++ dbPort ++ " dbname=" ++ dbName ++ " user=" ++ dbUser ++ " password=" ++ pwd
-  --conn <- liftIO $ dbConnect dbHost dbName dbUser pwd
-  putStrLn "Connecting to database..."
-  -- Placeholder for database query
-  let query = "SELECT id, name, email FROM users"
-  --result <- liftIO $ dbQuery conn query
-  --liftIO $ dbClose conn
-  putStrLn "Querying database..."
-  --let users = mapMaybe rowToUser result
-  pure [] -- users placeholder -- Remove later
+-- Handler to get all users
+getAllUsers : IO Response
+getAllUsers = do
+  password <- getDbPassword
+  conn <- connectDB (getConnectionString password)
+  case conn of
+       Left err => pure $ jsonResponse 500 $ JObject [("error", JString $ pack $ show err)]
+       Right c => do
+         result <- query c "SELECT id, name, email FROM users" []
+         close c
+         case result of
+              Left err => pure $ jsonResponse 500 $ JObject [("error", JString $ pack $ show err)]
+              Right qr =>
+                let
+                  users : List User
+                  users = mapMaybe (\row =>
+                                      case row of
+                                           [PGInt id, PGText name, PGText email] =>
+                                             Just $ MkUser (cast id) (cast name) (cast email)
+                                           _ => Nothing
+                                  ) (qrRows qr)
+                in
+                  pure $ jsonResponse 200 $ toJSON users
 
--- | Get user by ID
-getUserById : Int -> IO (Maybe User)
+-- Handler to create a new user
+createUser : Request -> IO Response
+createUser req = do
+  password <- getDbPassword
+  conn <- connectDB (getConnectionString password)
+  case conn of
+       Left err => pure $ jsonResponse 500 $ JObject [("error", JString $ pack $ show err)]
+       Right c => do
+          body <- getBody req
+          case decodeJSON body of
+               Nothing => pure $ textResponse 400 "Invalid JSON"
+               Just json =>
+                 case fromJSON json of
+                      Nothing => pure $ textResponse 400 "Invalid User data"
+                      Just (MkUser _ name email) => do
+                        result <- query c "INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id, name, email" [PGText name, PGText email]
+                        close c
+                        case result of
+                             Left err => pure $ jsonResponse 500 $ JObject [("error", JString $ pack $ show err)]
+                             Right qr =>
+                                case qrRows qr of
+                                     [[PGInt id, PGText name', PGText email']] =>
+                                         let newUser = MkUser (cast id) (cast name') (cast email') in
+                                         pure $ jsonResponse 201 $ toJSON newUser
+                                     _ => pure $ textResponse 500 "Failed to create user"
+
+-- Handler to get a user by ID
+getUserById : String -> IO Response
 getUserById userId = do
-  pwd <- dbPassword
-    -- Placeholder for database connection
-  let connStr = "host=" ++ dbHost ++ " port=" ++ dbPort ++ " dbname=" ++ dbName ++ " user=" ++ dbUser ++ " password=" ++ pwd
-  --conn <- liftIO $ dbConnect dbHost dbName dbUser pwd
-  putStrLn "Connecting to database..."
-  -- Placeholder for database query
-  let query = "SELECT id, name, email FROM users WHERE id = " ++ show userId
-  --result <- liftIO $ dbQuery conn query
-  --liftIO $ dbClose conn
-  putStrLn "Querying database..."
-  --case result of
-  --[] -> pure Nothing
-  --row :: _ -> case rowToUser row of
-       --Just user => pure (Just user)
-       --Nothing => pure Nothing
-  pure Nothing -- user placeholder -- Remove later
+  password <- getDbPassword
+  conn <- connectDB (getConnectionString password)
+  case conn of
+       Left err => pure $ jsonResponse 500 $ JObject [("error", JString $ pack $ show err)]
+       Right c => do
+         result <- query c "SELECT id, name, email FROM users WHERE id = $1" [PGInt $ cast $ parseInteger userId]
+         close c
+         case result of
+              Left err => pure $ jsonResponse 500 $ JObject [("error", JString $ pack $ show err)]
+              Right qr =>
+                case qrRows qr of
+                     [] => pure $ textResponse 404 "User not found"
+                     [[PGInt id, PGText name, PGText email]] =>
+                         let user = MkUser (cast id) (cast name) (cast email) in
+                         pure $ jsonResponse 200 $ toJSON user
+                     _ => pure $ textResponse 500 "Internal Server Error"
 
--- | Create a new user
-createUser : String -> String -> IO (Maybe User)
-createUser name email = do
-  pwd <- dbPassword
-  -- Placeholder for database connection
-  let connStr = "host=" ++ dbHost ++ " port=" ++ dbPort ++ " dbname=" ++ dbName ++ " user=" ++ dbUser ++ " password=" ++ pwd
-  --conn <- liftIO $ dbConnect dbHost dbName dbUser pwd
-  putStrLn "Connecting to database..."
-  -- Placeholder for database insertion
-  let query = "INSERT INTO users (name, email) VALUES ('" ++ name ++ "', '" ++ email ++ "') RETURNING id, name, email"
-  --result <- liftIO $ dbQuery conn query
-  --liftIO $ dbClose conn
-  putStrLn "Inserting user..."
-  --case result of
-  --[] -> pure Nothing
-  --row :: _ -> case rowToUser row of
-   --  Just user => pure (Just user)
-    -- Nothing => pure Nothing
-  pure Nothing  -- user placeholder -- Remove later
+-- Handler to update a user
+updateUser : String -> Request -> IO Response
+updateUser userId req = do
+  password <- getDbPassword
+  conn <- connectDB (getConnectionString password)
+  case conn of
+       Left err => pure $ jsonResponse 500 $ JObject [("error", JString $ pack $ show err)]
+       Right c => do
+          body <- getBody req
+          case decodeJSON body of
+               Nothing => pure $ textResponse 400 "Invalid JSON"
+               Just json =>
+                 case fromJSON json of
+                      Nothing => pure $ textResponse 400 "Invalid User data"
+                      Just (MkUser _ name email) => do
+                        result <- query c "UPDATE users SET name = $1, email = $2 WHERE id = $3" [PGText name, PGText email, PGInt $ cast $ parseInteger userId]
+                        close c
+                        case result of
+                             Left err => pure $ jsonResponse 500 $ JObject [("error", JString $ pack $ show err)]
+                             Right qr =>
+                               if affectedRows qr > 0
+                               then pure $ textResponse 204 ""
+                               else pure $ textResponse 404 "User not found"
 
--- | Update an existing user
-updateUser : Int -> String -> String -> IO Bool
-updateUser userId name email = do
-  pwd <- dbPassword
-  -- Placeholder for database connection
-  let connStr = "host=" ++ dbHost ++ " port=" ++ dbPort ++ " dbname=" ++ dbName ++ " user=" ++ dbUser ++ " password=" ++ pwd
-  --conn <- liftIO $ dbConnect dbHost dbName dbUser pwd
-  putStrLn "Connecting to database..."
-  -- Placeholder for database update
-  let query = "UPDATE users SET name = '" ++ name ++ "', email = '" ++ email ++ "' WHERE id = " ++ show userId
-  --rowsAffected <- liftIO $ dbExecute conn query
-  --liftIO $ dbClose conn
-  putStrLn "Updating user..."
-  pure False  -- rowsAffected placeholder -- Remove later
-
--- | Delete a user
-deleteUser : Int -> IO Bool
+-- Handler to delete a user
+deleteUser : String -> IO Response
 deleteUser userId = do
-  pwd <- dbPassword
-  -- Placeholder for database connection
-  let connStr = "host=" ++ dbHost ++ " port=" ++ dbPort ++ " dbname=" ++ dbName ++ " user=" ++ dbUser ++ " password=" ++ pwd
-  --conn <- liftIO $ dbConnect dbHost dbName dbUser pwd
-  putStrLn "Connecting to database..."
-  -- Placeholder for database deletion
-  let query = "DELETE FROM users WHERE id = " ++ show userId
-  --rowsAffected <- liftIO $ dbExecute conn query
-  --liftIO $ dbClose conn
-  putStrLn "Deleting user..."
-  pure False  -- rowsAffected placeholder -- Remove later
+  password <- getDbPassword
+  conn <- connectDB (getConnectionString password)
+  case conn of
+       Left err => pure $ jsonResponse 500 $ JObject [("error", JString $ pack $ show err)]
+       Right c => do
+         result <- query c "DELETE FROM users WHERE id = $1" [PGInt $ cast $ parseInteger userId]
+         close c
+         case result of
+              Left err => pure $ jsonResponse 500 $ JObject [("error", JString $ pack $ show err)]
+              Right qr =>
+                if affectedRows qr > 0
+                then pure $ textResponse 204 ""
+                else pure $ textResponse 404 "User not found"
 
--- | HTTP request handler
-handleRequest : String -> IO String --HTTPRequest to String for now for simplicity
-handleRequest req = do
-  putStrLn $ "Received request: " ++ req
-  pure "OK"
+-- Routing
+router : Router IO
+router = createRouter
+  [ Route GET "/users" getAllUsers
+  , Route POST "/users" createUser
+  , Route GET "/users/:id" (\req, params => maybe (pure $ textResponse 400 "Invalid ID") getUserById (lookup "id" params))
+  , Route PUT "/users/:id" (\req, params => maybe (pure $ textResponse 400 "Invalid ID") (\id => updateUser id req) (lookup "id" params))
+  , Route DELETE "/users/:id" (\req, params => maybe (pure $ textResponse 400 "Invalid ID") deleteUser (lookup "id" params))
+  ]
 
--- | Main function
+-- Main function
 main : IO ()
 main = do
-  putStrLn "Starting server..."
-  -- Placeholder for starting the server
-  --liftIO $ startServer 8080 handleRequest
-  pure ()
+  putStrLn "Starting server on port 8080..."
+  startServer router 8080
+

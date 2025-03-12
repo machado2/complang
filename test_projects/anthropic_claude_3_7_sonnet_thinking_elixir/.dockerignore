@@ -1,0 +1,14 @@
+# Elixir build artifacts
+/_build/
+/deps/
+/doc/
+/.fetch
+erl_crash.dump
+*.ez
+
+# Misc
+.git
+.gitignore
+Dockerfile
+.dockerignore
+README.md

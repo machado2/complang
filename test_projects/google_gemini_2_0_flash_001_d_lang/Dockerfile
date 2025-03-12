@@ -1,31 +1,34 @@
+
 FROM ubuntu:latest
 
-RUN apt-get update && apt-get install -y \
-    curl \
-    unzip \
-    libpq-dev \
-    xz-utils \
-    gnupg \
-    && rm -rf /var/lib/apt/lists/*
+# Update package lists
+RUN apt-get update
 
-# Install D compiler (DMD) - using the installer script
-RUN curl -fsS https://dlang.org/install.sh | bash -s dmd
+# Install necessary packages
+RUN apt-get install -y curl wget unzip
+RUN apt-get install -y libpq-dev
 
-# Set up environment variables
-ENV PATH="/usr/local/dmd/bin:${PATH}"
-ENV LIBRARY_PATH="/usr/local/dmd/lib:${LIBRARY_PATH}"
+# Install D compiler (dmd) - Correct the package name here
+RUN apt-get install -y ldc
 
+# Install vibe.d
+RUN curl -fsS https://dlang.org/install.sh | sh -sf -d /usr/local -v
+
+# Set environment variables
+ENV PGPASSWORD=${PGPASSWORD}
+ENV APP_PORT=8080
+
+# Create app directory
 WORKDIR /app
 
-COPY dub.json .
-COPY src ./src
+# Copy application source code
+COPY . .
 
-# Activate D environment so dub can be found
-RUN source /root/dlang/dmd-*/activate
+# Build the application
+RUN dmd -O -release src/app.d -L-lpostgres -L-lpq
 
-RUN dub fetch
-RUN dub build
+# Expose the port
+EXPOSE $APP_PORT
 
-EXPOSE 8080
-
-CMD ["./complang_api"]
+# Command to run the application
+CMD ["./app"]

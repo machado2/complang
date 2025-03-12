@@ -1,19 +1,7 @@
-FROM ruby:3.2
-
-# Install dependencies for building gems and the pg gem
-RUN apt-get update -qq && apt-get install -y build-essential libpq-dev
-
+FROM ruby:3.2-slim
 WORKDIR /app
-
-# Copy Gemfile and install dependencies
-COPY Gemfile* ./
-RUN bundle install
-
-# Copy the entire application
-COPY . .
-
-# Expose port 8080
+COPY Gemfile /app/Gemfile
+RUN gem install bundler && bundle install
+COPY . /app
 EXPOSE 8080
-
-# Start the application using rackup with Puma (the default rackup server)
-CMD ["bundle", "exec", "rackup", "-o", "0.0.0.0", "-p", "8080"]
+CMD ["ruby", "app.rb"]

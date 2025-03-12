@@ -1,22 +1,18 @@
 
-FROM drakma/sbcl
+FROM clojure:latest
 
-RUN apt-get update -y
-RUN apt-get install -y postgresql-client curl
-
-# Install quicklisp
+# Install Quicklisp
+RUN apt-get update && apt-get install -y curl
 RUN curl -O https://beta.quicklisp.org/quicklisp.lisp
-RUN sbcl --load quicklisp.lisp --eval '(quicklisp-quickstart:install)' --quit
-RUN ln -s /root/.quicklisp/bin/ql /usr/local/bin/ql
+RUN clojure -M -e "(load "quicklisp.lisp")"
+RUN clojure -M -e "(quicklisp-quickstart:install)"
 
+# Copy the Lisp code
 WORKDIR /app
-
-COPY users-api.asd .
-COPY users.lisp .
+COPY complang.lisp .
 
 # Install dependencies
-RUN ql install users-api
+RUN clojure -Sdeps '{:deps {org.clojure/clojure {:mvn/version "1.11.1"} postgresql/postgresql {:mvn/version "9.4-1206-jdbc42"}  }' -e nil
 
-# Load and run the application
-CMD ql eval '(users-api:main)'
-EXPOSE 8080
+# Set the entrypoint
+CMD ["clojure", "complang.lisp"]

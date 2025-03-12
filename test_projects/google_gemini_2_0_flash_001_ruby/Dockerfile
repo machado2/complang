@@ -1,13 +1,12 @@
-
 FROM ruby:3.1
 
 WORKDIR /app
 
-COPY Gemfile Gemfile
-RUN BUNDLE_IGNORE_CONFIG=1 bundle install
+COPY Gemfile .
+RUN bundle install
 
 COPY . .
 
 EXPOSE 8080
 
-CMD ["ruby", "app.rb", "-p", "8080"]
+CMD ["rackup", "-p", "8080", "-o", "0.0.0.0"]

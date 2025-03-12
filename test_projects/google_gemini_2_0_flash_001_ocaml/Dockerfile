@@ -1,30 +1,23 @@
 
-FROM ocaml/opam:debian-11-ocaml-4.14
+FROM ocaml/opam:ubuntu-22.04
 
 WORKDIR /app
 
-# Install required system dependencies
-RUN sudo apt-get update && sudo apt-get install -y --no-install-recommends     libpq-dev libgmp-dev pkg-config
+# Install system dependencies
+RUN apt-get update -y && apt-get install -y --no-install-recommends postgresql-client libpq-dev
 
-# Install OCaml dependencies
-COPY complang.opam .
-RUN opam install . --deps-only -y
-
-# Create bin directory
-RUN mkdir -p bin
-
-# Copy the source code
+# Copy project files
 COPY . .
 
-# Build the project
-RUN opam install --yes --dot-merlin .
-RUN eval $(opam env) && dune build
+# Install OCaml dependencies
+RUN opam update
+RUN opam install --yes --deps-only .
 
-# Expose the port
+# Build the application
+RUN eval $(opam env) && dune build ./bin/main.exe
+
+# Expose port
 EXPOSE 8080
 
-# Set the PGPASSWORD environment variable
-ENV PGPASSWORD=Saloon5-Moody-Observing
-
-# Run the executable
-CMD ["dune", "exec", "bin/main.exe"]
+# Run the application
+CMD ["dune" "exec" "./bin/main.exe"]

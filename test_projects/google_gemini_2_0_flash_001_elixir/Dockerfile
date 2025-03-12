@@ -1,19 +1,43 @@
 
-FROM elixir:1.14
+FROM elixir:1.14-otp-26 AS builder
 
 WORKDIR /app
 
-RUN mix local.hex --force && \
-    mix local.rebar --force
+RUN apt-get update && apt-get install -y --no-install-recommends     postgresql-client
 
-COPY mix.exs ./
+# Install hex and rebar
+RUN mix local.hex --force
+RUN mix local.rebar --force
+
+# Copy project files
+COPY mix.exs .
+COPY mix.lock .
+
+# Get deps
 RUN mix deps.get
-COPY mix.lock ./
+RUN mix deps.compile
 
-ENV PGPASSWORD=${PGPASSWORD}
+COPY config config
+COPY lib lib
+COPY priv priv
 
-COPY . .
+# Compile the project
+RUN mix compile
 
+# Release
+RUN mix release
+
+FROM alpine:3.18 AS release
+
+WORKDIR /app
+
+RUN apk update && apk add --no-cache libstdc++ postgresql-client
+
+# Copy the release from the builder stage
+COPY --from=builder /app/_build/prod/rel/complang ./
+
+# Set the port
 EXPOSE 8080
 
-CMD ["mix", "phx.server"]
+# Run the application
+CMD ["/app/bin/complang", "start"]

@@ -1,89 +1,95 @@
 require 'sinatra'
-require 'sinatra/json'
 require 'pg'
 require 'json'
 
-set :bind, '0.0.0.0'
 set :port, 8080
+set :bind, '0.0.0.0'
 
-# Configure the PostgreSQL connection using environment variable for the password
-configure do
-  db_config = {
+def db_connection
+  PG.connect(
     host: 'host.docker.internal',
     port: 5432,
     dbname: 'complang',
     user: 'testuser',
     password: ENV['PGPASSWORD']
-  }
-  set :db, PG.connect(db_config)
+  )
 end
 
-# POST /users: Create a new user
+# POST /users: create a new user
 post '/users' do
-  begin
-    payload = JSON.parse(request.body.read)
-    name = payload['name']
-    email = payload['email']
-    unless name && email
-      halt 400, json(message: 'Name and email are required')
-    end
-    result = settings.db.exec_params(
-      "INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id, name, email",
-      [name, email]
-    )
-    status 201
-    json result.first
-  rescue JSON::ParserError
-    halt 400, json(message: 'Invalid JSON')
-  end
+  content_type :json
+  request_payload = JSON.parse(request.body.read)
+  name = request_payload["name"]
+  email = request_payload["email"]
+
+  conn = db_connection
+  result = conn.exec_params("INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id, name, email", [name, email])
+  conn.close
+
+  status 201
+  result[0].to_json
 end
 
-# GET /users: List all users
+# GET /users: list all users
 get '/users' do
-  result = settings.db.exec("SELECT id, name, email FROM users ORDER BY id")
+  content_type :json
+  conn = db_connection
+  result = conn.exec("SELECT id, name, email FROM users")
   users = result.map { |row| row }
-  json users
+  conn.close
+  users.to_json
 end
 
-# GET /users/:id: Get a single user by id
+# GET /users/:id: get a single user
 get '/users/:id' do
+  content_type :json
   id = params['id']
-  result = settings.db.exec_params("SELECT id, name, email FROM users WHERE id = $1", [id])
-  if result.ntuples == 0
-    halt 404, json(message: 'User not found')
+  conn = db_connection
+  result = conn.exec_params("SELECT id, name, email FROM users WHERE id = $1", [id])
+  conn.close
+
+  if result.ntuples > 0
+    result[0].to_json
+  else
+    status 404
+    { error: "User not found" }.to_json
   end
-  json result.first
 end
 
-# PUT /users/:id: Update an existing user
+# PUT /users/:id: update a user
 put '/users/:id' do
+  content_type :json
   id = params['id']
-  begin
-    payload = JSON.parse(request.body.read)
-    name = payload['name']
-    email = payload['email']
-    unless name && email
-      halt 400, json(message: 'Name and email are required')
-    end
-    result = settings.db.exec_params(
-      "UPDATE users SET name = $1, email = $2 WHERE id = $3 RETURNING id, name, email",
-      [name, email, id]
-    )
-    if result.ntuples == 0
-      halt 404, json(message: 'User not found')
-    end
-    json result.first
-  rescue JSON::ParserError
-    halt 400, json(message: 'Invalid JSON')
+  request_payload = JSON.parse(request.body.read)
+  name = request_payload["name"]
+  email = request_payload["email"]
+
+  conn = db_connection
+  result = conn.exec_params("UPDATE users SET name = $1, email = $2 WHERE id = $3 RETURNING id, name, email", [name, email, id])
+  conn.close
+
+  if result.ntuples > 0
+    result[0].to_json
+  else
+    status 404
+    { error: "User not found" }.to_json
   end
 end
 
-# DELETE /users/:id: Delete a user
+# DELETE /users/:id: delete a user
 delete '/users/:id' do
+  content_type :json
   id = params['id']
-  result = settings.db.exec_params("DELETE FROM users WHERE id = $1", [id])
-  if result.cmd_tuples == 0
-    halt 404, json(message: 'User not found')
+
+  conn = db_connection
+  result = conn.exec_params("DELETE FROM users WHERE id = $1", [id])
+  conn.close
+
+  if result.cmd_tuples > 0
+    status 204
+    ""
+  else
+    status 404
+    { error: "User not found" }.to_json
   end
-  status 204
 end

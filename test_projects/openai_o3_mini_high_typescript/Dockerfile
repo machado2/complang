@@ -1,23 +1,22 @@
-# Use an official Node.js runtime as a parent image
 FROM node:16-alpine
 
-# Create and set the working directory
+# Set working directory
 WORKDIR /app
 
-# Copy package.json and package-lock.json (if available)
-COPY package*.json ./
+# Copy dependency definitions
+COPY package.json tsconfig.json ./
 
 # Install dependencies
 RUN npm install
 
-# Copy the rest of the application code
-COPY . .
+# Copy source files
+COPY src/ ./src/
 
-# Build the TypeScript code
+# Build the project
 RUN npm run build
 
-# Expose port 8080
+# Expose the port the app runs on
 EXPOSE 8080
 
-# Start the server
-CMD [ "npm", "start" ]
+# Start the app
+CMD ["npm", "start"]

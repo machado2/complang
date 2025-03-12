@@ -1,147 +1,137 @@
-use Cro::HTTP::Router;
-use Cro::HTTP::Server;
+use Cro::HTTP;
+use Cro::Route;
 use JSON::Fast;
-use DBIish;
-use Env::PGPASSWORD;
+use DB::Pg;
+use Env;
 
-# Database connection details
-my $host     = 'host.docker.internal';
-my $port     = 5432;
-my $database = 'complang';
-my $user     = 'testuser';
-my $password = $ENV{PGPASSWORD} // die "PGPASSWORD environment variable not set";
+# Database Configuration
+my $db-host     = 'host.docker.internal';
+my $db-port     = 5432;
+my $db-name     = 'complang';
+my $db-user     = 'testuser';
+my $db-password = getenv('PGPASSWORD') // die 'PGPASSWORD environment variable not set';
 
 # Database connection string
-my $dsn = "dbi:Pg:dbname=$database;host=$host;port=$port";
+my $conn-string = "host=$db-host port=$db-port dbname=$db-name user=$db-user password=$db-password";
 
-# Function to connect to the database
-sub connect-db {
-    return DBIish.connect: $dsn, $user, $password, { RaiseError => 1, PrintError => 0 };
+# Route table
+my $application = route {
+    get    -> '/users'        => { getAllUsers() };
+    post   -> '/users'        => { createUser() };
+    get    -> '/users/:id'    => { getUser(.id) };
+    put    -> '/users/:id'    => { updateUser(.id) };
+    delete -> '/users/:id'    => { deleteUser(.id) };
+
+    not-found => { content(404, 'Not found') }
+};
+
+# --- Route Handlers ---
+
+sub getAllUsers() {
+    my $db = DB::Pg.new($conn-string);
+    my $users = $db.query('SELECT id, name, email FROM users');
+    my @results;
+    while $users.fetch() -> $row {
+        push @results, {
+            id    => +$row<id>,
+            name  => $row<name>,
+            email => $row<email>
+        };
+    }
+    $db.close;
+    content(200, to-json @results);
 }
 
+sub createUser() {
+    my $body = from-json request.body;
+    my $name  = $body<name>;
+    my $email = $body<email>;
 
-# Route definitions
-my $router = Cro::HTTP::Router.new(
-    route {
-        get {
-            header "Content-Type" => "application/json";
-            path "/users" => {
-                my $dbh = connect-db();
-                my $sth = $dbh.prepare("SELECT id, name, email FROM users");
-                $sth.execute();
-                my @users;
-                while my $row = $sth.fetchrow_hashref() {
-                    push @users, {
-                        id    => $row<id>.Int,
-                        name  => $row<name>.Str,
-                        email => $row<email>.Str,
-                    };
-                }
-                $sth.finish();
-                $dbh.disconnect();
-                content encode-json @users;
-            }
-            path "/users/:id" => {
-                my $id = $/.captures[0];
-                my $dbh = connect-db();
-                my $sth = $dbh.prepare("SELECT id, name, email FROM users WHERE id = ?");
-                $sth.execute($id);
-                if my $row = $sth.fetchrow_hashref() {
-                    $sth.finish();
-                    $dbh.disconnect();
-                    content encode-json {
-                        id    => $row<id>.Int,
-                        name  => $row<name>.Str,
-                        email => $row<email>.Str,
-                    };
-                } else {
-                    $sth.finish();
-                    $dbh.disconnect();
-                    status 404;
-                    content encode-json { message => "User not found" };
-                }
-            }
-        }
-        post {
-            header "Content-Type" => "application/json";
-            path "/users" => {
-                my $json = decode-json request.body.decode;
-                my $name  = $json<name>;
-                my $email = $json<email>;
-
-                unless (defined $name && defined $email) {
-                    status 400;
-                    content encode-json { message => "Name and email are required" };
-                    next;
-                }
-                my $dbh = connect-db();
-                my $sth = $dbh.prepare("INSERT INTO users (name, email) VALUES (?, ?) RETURNING id, name, email");
-                $sth.execute($name, $email);
-                my $row = $sth.fetchrow_hashref();
-                $sth.finish();
-                $dbh.disconnect();
-                status 201;
-                content encode-json {
-                    id    => $row<id>.Int,
-                    name  => $row<name>.Str,
-                    email => $row<email>.Str,
-                };
-            }
-        }
-        put {
-            header "Content-Type" => "application/json";
-            path "/users/:id" => {
-                my $id   = $/.captures[0];
-                my $json = decode-json request.body.decode;
-                my $name  = $json<name>;
-                my $email = $json<email>;
-
-                unless (defined $name && defined $email) {
-                    status 400;
-                    content encode-json { message => "Name and email are required" };
-                    next;
-                }
-                my $dbh = connect-db();
-                my $sth = $dbh.prepare("UPDATE users SET name = ?, email = ? WHERE id = ? RETURNING id, name, email");
-                $sth.execute($name, $email, $id);
-                if (my $row = $sth.fetchrow_hashref()) {
-                    $sth.finish();
-                    $dbh.disconnect();
-                    status 200;
-                } else {
-                    $sth.finish();
-                    $dbh.disconnect();
-                    status 404;
-                    content encode-json { message => "User not found" };
-                }
-            }
-        }
-        delete {
-            header "Content-Type" => "application/json";
-            path "/users/:id" => {
-                my $id = $/.captures[0];
-                my $dbh = connect-db();
-                my $sth = $dbh.prepare("DELETE FROM users WHERE id = ? RETURNING id");
-                $sth.execute($id);
-                if ($sth.rows) {
-                  $sth.finish();
-                  $dbh.disconnect();
-                  status 200;
-                }
-                else {
-                    $sth.finish();
-                    $dbh.disconnect();
-                    status 404;
-                    content encode-json { message => "User not found" };
-                }
-            }
-        }
+    unless ($name && $email) {
+        content(400, 'Bad Request: Missing name or email');
+        return;
     }
-);
+
+    my $db = DB::Pg.new($conn-string);
+    my $result = $db.query("INSERT INTO users (name, email) VALUES ('$name', '$email') RETURNING id, name, email");
+    $result.fetch() -> $row;
+    my $user = {
+        id    => +$row<id>,
+        name  => $row<name>,
+        email => $row<email>
+    };
+    $db.close;
+    content(201, to-json $user);
+}
+
+sub getUser(Int:D $id) {
+    my $db = DB::Pg.new($conn-string);
+    my $result = $db.query("SELECT id, name, email FROM users WHERE id = $id");
+    unless ($result.rows) {
+        $db.close;
+        content(404, 'Not Found');
+        return;
+    }
+    $result.fetch() -> $row;
+    my $user = {
+        id    => +$row<id>,
+        name  => $row<name>,
+        email => $row<email>
+    };
+    $db.close;
+    content(200, to-json $user);
+}
+
+sub updateUser(Int:D $id) {
+    my $body = from-json request.body;
+    my $name  = $body<name>;
+    my $email = $body<email>;
+
+    unless ($name && $email) {
+        content(400, 'Bad Request: Missing name or email');
+        return;
+    }
+
+    my $db = DB::Pg.new($conn-string);
+    my $result = $db.query("UPDATE users SET name = '$name', email = '$email' WHERE id = $id");
+
+    if ($db.affected-rows == 0) {
+        $db.close;
+        content(404, 'Not Found');
+        return;
+    }
+
+    $db.close;
+    content(204, '');
+}
+
+sub deleteUser(Int:D $id) {
+    my $db = DB::Pg.new($conn-string);
+    my $result = $db.query("DELETE FROM users WHERE id = $id");
+
+    if ($db.affected-rows == 0) {
+        $db.close;
+        content(404, 'Not Found');
+        return;
+    }
+
+    $db.close;
+    content(204, '');
+}
 
 # Start the server
-Cro::HTTP::Server.new(
-    http => { port => 8080 },
-    application => $router
-).start;
+my $port = 8080;
+my $server = Cro::HTTP::Server.new(
+    port => $port,
+    application => $application
+);
 
+$server.start;
+
+react {
+    whenever signal(SIGINT) {
+        say "Exiting...";
+        $server.stop;
+        exit;
+    }
+}

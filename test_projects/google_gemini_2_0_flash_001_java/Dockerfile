@@ -1,7 +1,17 @@
-FROM eclipse-temurin:17-jdk
+
+FROM openjdk:17-jdk-slim
+
+ENV PGPASSWORD=Saloon5-Moody-Observing
+EXPOSE 8080
+
 WORKDIR /app
+
 COPY pom.xml .
+RUN apt-get update && apt-get install -y maven
 RUN mvn dependency:go-offline
-RUN mvn package -DskipTests
-COPY target/user-api-0.0.1-SNAPSHOT.jar app.jar
-ENTRYPOINT ["java","-jar","app.jar"]
+
+COPY src ./src
+
+RUN mvn clean install
+
+CMD ["java", "-jar", "target/complang-api-0.0.1-SNAPSHOT.jar"]

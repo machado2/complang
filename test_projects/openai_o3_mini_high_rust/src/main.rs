@@ -1,126 +1,127 @@
-use actix_web::{web, App, HttpServer, Responder, HttpResponse, Error};
-use sqlx::postgres::PgPoolOptions;
-use serde::{Deserialize, Serialize};
-use std::env;
 
-#[derive(Debug, Serialize, sqlx::FromRow)]
+use actix_web::{web, App, HttpResponse, HttpServer, Responder};
+use serde::{Deserialize, Serialize};
+use sqlx::{postgres::PgPoolOptions, PgPool};
+
+#[derive(Serialize, Deserialize, sqlx::FromRow)]
 struct User {
     id: i32,
     name: String,
     email: String,
 }
 
-#[derive(Debug, Deserialize)]
-struct NewUser {
+#[derive(Serialize, Deserialize)]
+struct CreateUser {
     name: String,
     email: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct UpdateUser {
     name: String,
     email: String,
 }
 
-async fn create_user(pool: web::Data<sqlx::PgPool>, new_user: web::Json<NewUser>) -> Result<impl Responder, Error> {
-    let user = sqlx::query_as!(
-        User,
-        "INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id, name, email",
-        new_user.name,
-        new_user.email
+async fn create_user(pool: web::Data<PgPool>, item: web::Json<CreateUser>) -> impl Responder {
+    let result = sqlx::query_as::<_, User>(
+        "INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id, name, email"
     )
+    .bind(&item.name)
+    .bind(&item.email)
     .fetch_one(pool.get_ref())
-    .await
-    .map_err(actix_web::error::ErrorInternalServerError)?;
-    Ok(HttpResponse::Created().json(user))
-}
+    .await;
 
-async fn get_users(pool: web::Data<sqlx::PgPool>) -> Result<impl Responder, Error> {
-    let users = sqlx::query_as!(
-        User,
-        "SELECT id, name, email FROM users"
-    )
-    .fetch_all(pool.get_ref())
-    .await
-    .map_err(actix_web::error::ErrorInternalServerError)?;
-    Ok(HttpResponse::Ok().json(users))
-}
-
-async fn get_user(pool: web::Data<sqlx::PgPool>, user_id: web::Path<i32>) -> Result<impl Responder, Error> {
-    let user = sqlx::query_as!(
-        User,
-        "SELECT id, name, email FROM users WHERE id = $1",
-        *user_id
-    )
-    .fetch_optional(pool.get_ref())
-    .await
-    .map_err(actix_web::error::ErrorInternalServerError)?;
-    if let Some(u) = user {
-        Ok(HttpResponse::Ok().json(u))
-    } else {
-        Ok(HttpResponse::NotFound().finish())
+    match result {
+        Ok(user) => HttpResponse::Created().json(user),
+        Err(e) => {
+            eprintln!("Error inserting user: {:?}", e);
+            HttpResponse::InternalServerError().finish()
+        }
     }
 }
 
-async fn update_user(pool: web::Data<sqlx::PgPool>, user_id: web::Path<i32>, update: web::Json<UpdateUser>) -> Result<impl Responder, Error> {
-    let updated_user = sqlx::query_as!(
-        User,
-        "UPDATE users SET name = $1, email = $2 WHERE id = $3 RETURNING id, name, email",
-        update.name,
-        update.email,
-        *user_id
-    )
-    .fetch_optional(pool.get_ref())
-    .await
-    .map_err(actix_web::error::ErrorInternalServerError)?;
-    
-    if let Some(user) = updated_user {
-        Ok(HttpResponse::Ok().json(user))
-    } else {
-        Ok(HttpResponse::NotFound().finish())
+async fn get_users(pool: web::Data<PgPool>) -> impl Responder {
+    let result = sqlx::query_as::<_, User>("SELECT id, name, email FROM users")
+        .fetch_all(pool.get_ref())
+        .await;
+    match result {
+        Ok(users) => HttpResponse::Ok().json(users),
+        Err(e) => {
+            eprintln!("Error fetching users: {:?}", e);
+            HttpResponse::InternalServerError().finish()
+        }
     }
 }
 
-async fn delete_user(pool: web::Data<sqlx::PgPool>, user_id: web::Path<i32>) -> Result<impl Responder, Error> {
-    let result = sqlx::query!(
-        "DELETE FROM users WHERE id = $1",
-        *user_id
-    )
-    .execute(pool.get_ref())
-    .await
-    .map_err(actix_web::error::ErrorInternalServerError)?;
-    
-    if result.rows_affected() == 0 {
-        Ok(HttpResponse::NotFound().finish())
-    } else {
-        Ok(HttpResponse::NoContent().finish())
+async fn get_user(pool: web::Data<PgPool>, user_id: web::Path<i32>) -> impl Responder {
+    let result = sqlx::query_as::<_, User>("SELECT id, name, email FROM users WHERE id = $1")
+        .bind(user_id.into_inner())
+        .fetch_optional(pool.get_ref())
+        .await;
+    match result {
+        Ok(Some(user)) => HttpResponse::Ok().json(user),
+        Ok(None) => HttpResponse::NotFound().finish(),
+        Err(e) => {
+            eprintln!("Error fetching user: {:?}", e);
+            HttpResponse::InternalServerError().finish()
+        }
+    }
+}
+
+async fn update_user(pool: web::Data<PgPool>, user_id: web::Path<i32>, item: web::Json<UpdateUser>) -> impl Responder {
+    let result = sqlx::query("UPDATE users SET name = $1, email = $2 WHERE id = $3")
+        .bind(&item.name)
+        .bind(&item.email)
+        .bind(user_id.into_inner())
+        .execute(pool.get_ref())
+        .await;
+    match result {
+        Ok(r) if r.rows_affected() > 0 => HttpResponse::Ok().finish(),
+        Ok(_) => HttpResponse::NotFound().finish(),
+        Err(e) => {
+            eprintln!("Error updating user: {:?}", e);
+            HttpResponse::InternalServerError().finish()
+        }
+    }
+}
+
+async fn delete_user(pool: web::Data<PgPool>, user_id: web::Path<i32>) -> impl Responder {
+    let result = sqlx::query("DELETE FROM users WHERE id = $1")
+        .bind(user_id.into_inner())
+        .execute(pool.get_ref())
+        .await;
+    match result {
+        Ok(r) if r.rows_affected() > 0 => HttpResponse::Ok().finish(),
+        Ok(_) => HttpResponse::NotFound().finish(),
+        Err(e) => {
+            eprintln!("Error deleting user: {:?}", e);
+            HttpResponse::InternalServerError().finish()
+        }
     }
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    env_logger::init();
-    dotenv::dotenv().ok();
-    let pg_password = env::var("PGPASSWORD").expect("PGPASSWORD must be set");
+    // Retrieve the PGPASSWORD from environment variable.
+    let pg_password = std::env::var("PGPASSWORD").expect("PGPASSWORD env var not set");
     let database_url = format!("postgres://testuser:{}@host.docker.internal:5432/complang", pg_password);
-    
+
     let pool = PgPoolOptions::new()
         .max_connections(5)
         .connect(&database_url)
         .await
-        .expect("Failed to connect to database.");
+        .expect("Failed to create pool");
+
+    println!("Starting server on 0.0.0.0:8080");
 
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(pool.clone()))
-            .service(
-                web::scope("/users")
-                    .route("", web::post().to(create_user))
-                    .route("", web::get().to(get_users))
-                    .route("/{id}", web::get().to(get_user))
-                    .route("/{id}", web::put().to(update_user))
-                    .route("/{id}", web::delete().to(delete_user))
-            )
+            .route("/users", web::post().to(create_user))
+            .route("/users", web::get().to(get_users))
+            .route("/users/{id}", web::get().to(get_user))
+            .route("/users/{id}", web::put().to(update_user))
+            .route("/users/{id}", web::delete().to(delete_user))
     })
     .bind("0.0.0.0:8080")?
     .run()

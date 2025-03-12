@@ -1,19 +1,8 @@
-FROM idris-lang/idris:latest
-
-# Install PostgreSQL client and necessary libraries
-RUN apt-get update && apt-get install -y libpq-dev postgresql-client
-
-# Set the working directory
+FROM ubuntu:20.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y idris && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-
-# Copy project files into the container
 COPY . .
-
-# Build the Idris project (assumes Main.idr is the entry point)
-RUN idris Main.idr -o app
-
-# Expose port 8080
+RUN idris Main.idr -o server
 EXPOSE 8080
-
-# Command to run the application
-CMD ["./app"]
+CMD ["./server"]

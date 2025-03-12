@@ -23,16 +23,9 @@ type User struct {
 var db *sql.DB
 
 func main() {
-	pgPassword, present := os.LookupEnv("PGPASSWORD")
-	if !present {
-		log.Fatal("PGPASSWORD environment variable not set")
-		return
-	}
-	connStr := fmt.Sprintf("host=host.docker.internal port=5432 dbname=complang user=testuser password=%s sslmode=disable", pgPassword)
-
-
 	var err error
-	db, err = sql.Open("postgres", connStr)
+	db, err = sql.Open("postgres", fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		"host.docker.internal", "5432", "testuser", os.Getenv("PGPASSWORD"), "complang"))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -43,16 +36,42 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Connected to DB")
+	fmt.Println("Connected to the database")
 
 	router := mux.NewRouter()
-	router.HandleFunc("/users", getUsers).Methods("GET")
 	router.HandleFunc("/users", createUser).Methods("POST")
+	router.HandleFunc("/users", getUsers).Methods("GET")
 	router.HandleFunc("/users/{id}", getUser).Methods("GET")
 	router.HandleFunc("/users/{id}", updateUser).Methods("PUT")
 	router.HandleFunc("/users/{id}", deleteUser).Methods("DELETE")
 
 	log.Fatal(http.ListenAndServe(":8080", router))
+}
+
+func createUser(w http.ResponseWriter, r *http.Request) {
+	var user User
+	err := json.NewDecoder(r.Body).Decode(&user)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err = validateUser(user)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	insertStmt := `INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id`
+	err = db.QueryRow(insertStmt, user.Name, user.Email).Scan(&user.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(user)
 }
 
 func getUsers(w http.ResponseWriter, r *http.Request) {
@@ -63,7 +82,7 @@ func getUsers(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	users := []User{}
+	var users []User
 	for rows.Next() {
 		var user User
 		err := rows.Scan(&user.ID, &user.Name, &user.Email)
@@ -78,34 +97,6 @@ func getUsers(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(users)
 }
 
-func createUser(w http.ResponseWriter, r *http.Request) {
-	var user User
-	err := json.NewDecoder(r.Body).Decode(&user)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	
-	err = validateUser(user)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	var id int
-	err = db.QueryRow("INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id", user.Name, user.Email).Scan(&id)
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	user.ID = id
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(user)
-}
-
 func getUser(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
@@ -118,7 +109,7 @@ func getUser(w http.ResponseWriter, r *http.Request) {
 	err = db.QueryRow("SELECT id, name, email FROM users WHERE id = $1", id).Scan(&user.ID, &user.Name, &user.Email)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			http.NotFound(w, r)
+			http.Error(w, "User not found", http.StatusNotFound)
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -150,7 +141,8 @@ func updateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := db.Exec("UPDATE users SET name = $1, email = $2 WHERE id = $3", user.Name, user.Email, id)
+	updateStmt := `UPDATE users SET name = $1, email = $2 WHERE id = $3`
+	result, err := db.Exec(updateStmt, user.Name, user.Email, id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -163,7 +155,7 @@ func updateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if rowsAffected == 0 {
-		http.NotFound(w, r)
+		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
 
@@ -191,20 +183,20 @@ func deleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if rowsAffected == 0 {
-		http.NotFound(w, r)
+		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
 }
 
-
 func validateUser(user User) error {
 	if user.Name == "" {
-		return fmt.Errorf("name can't be empty")
+		return fmt.Errorf("name is required")
 	}
 	if user.Email == "" {
-		return fmt.Errorf("email can't be empty")
+		return fmt.Errorf("email is required")
 	}
 	return nil
 }
+

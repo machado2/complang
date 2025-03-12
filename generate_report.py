@@ -5,34 +5,34 @@ import matplotlib.pyplot as plt
 # --- Constants ---
 LLM_PRICES = {
     "anthropic/claude-3.7-sonnet": {"input": 3.00, "output": 15.00},
+    "anthropic/claude-3.7-sonnet:thinking": {"input": 3.00, "output": 15.00},
     "openai/o3-mini-high": {"input": 1.10, "output": 4.40},
     "openai/gpt-4o-mini": {"input": 0.15, "output": 0.60},
+    "openai/gpt-4o": {"input": 2.5, "output": 10},
     "google/gemini-2.0-flash-001": {"input": 0.10, "output": 0.40},
     "meta-llama/llama-3.3-70b-instruct": {"input": 0.12, "output": 0.30},
-    # Add prices for other LLMs if needed
 }
-DEFAULT_INPUT_TOKEN_PRICE_PER_1M = 0.001  # Default price if LLM price is not found
-DEFAULT_OUTPUT_TOKEN_PRICE_PER_1M = 0.002 # Default price if LLM price is not found
+DEFAULT_INPUT_TOKEN_PRICE_PER_1M = 0.00  # Default price if LLM price is not found
+DEFAULT_OUTPUT_TOKEN_PRICE_PER_1M = 0.00 # Default price if LLM price is not found
 CHECKPOINT_FILE = "checkpoint.json"
-REPORT_FILE = "test_report_2.md"
+REPORT_FILE = "test_report.md"
 
 def calculate_cost(llm_model, input_tokens, output_tokens):
     """Calculates the cost of a test based on token usage and LLM model prices."""
     if input_tokens is None or output_tokens is None:
-        return "N/A"  # Handle cases where token counts are not available
+        return 0
 
     prices = LLM_PRICES.get(llm_model)
     if prices:
         input_price_per_1M = prices["input"]
         output_price_per_1M = prices["output"]
     else:
-        print(f"Warning: Prices not found for LLM model '{llm_model}'. Using default prices.")
         input_price_per_1M = DEFAULT_INPUT_TOKEN_PRICE_PER_1M
         output_price_per_1M = DEFAULT_OUTPUT_TOKEN_PRICE_PER_1M
 
     input_cost = (input_tokens / 1_000_000) * input_price_per_1M
     output_cost = (output_tokens / 1_000_000) * output_price_per_1M
-    return f"${input_cost + output_cost:.4f}"
+    return input_cost + output_cost
 
 def generate_report():
     """Generates a test report from checkpoint data."""
@@ -47,7 +47,9 @@ def generate_report():
     except json.JSONDecodeError:
         print(f"Error: Invalid JSON format in {CHECKPOINT_FILE}. Please check the file content.")
         return
-
+    
+    results = sorted(results, key=lambda r: (r["stack"], r["llm"]))
+    
     report_content = "# Test Report\n\n"
     report_content += "This report summarizes the results of LLM tests across different stacks.\n\n"
 
@@ -61,7 +63,7 @@ def generate_report():
         table_data.append([r["llm"], 
                            r["stack"],
                            status, 
-                           cost, 
+                           f"{cost:.4f}", 
                            f"{r['duration']:.2f}", 
                            r["steps"], 
                            r["attempts"], 
@@ -104,13 +106,14 @@ def generate_report():
     report_content += "\n\n"
 
     # --- Top 10 Cheapest Succesful Tests ---
-    report_content += "## Top 10 Cheapest Successful Tests\n\n"
+    report_content += "## Top 10 Cheapest (not free) Successful Tests\n\n"
     cheapest_successful_tests = []
     for r in results:
         if r["success"]:
             cost = calculate_cost(r["llm"], r.get("input_tokens"), r.get("output_tokens"))
-            cheapest_successful_tests.append([r["llm"], r["stack"], cost])
-    cheapest_successful_tests = sorted(cheapest_successful_tests, key=lambda x: float(x[2].replace("$", "")))[0:10]
+            if cost > 0:
+                cheapest_successful_tests.append([r["llm"], r["stack"], cost])
+    cheapest_successful_tests = sorted(cheapest_successful_tests, key=lambda x: x[2])[0:10]
     cheapest_successful_tests_headers = ["LLM", "Stack", "Cost"]
     report_content += tabulate(cheapest_successful_tests, cheapest_successful_tests_headers, tablefmt="github")
     report_content += "\n\n"
@@ -125,44 +128,6 @@ def generate_report():
     fastest_successful_tests_headers = ["LLM", "Stack", "Time (s)"]
     report_content += tabulate(fastest_successful_tests, fastest_successful_tests_headers, tablefmt="github")
     report_content += "\n\n"
-
-    # --- Graphs ---
-    report_content += "## Visualizations\n\n"
-
-    # Stack Success Rate Bar Chart
-    stack_names = [item[0] for item in stack_summary_data]
-    stack_success_values = [item[1] for item in stack_summary_data]
-
-    plt.figure(figsize=(10, 6))
-    plt.bar(stack_names, stack_success_values, color='skyblue')
-    plt.xlabel("Stack")
-    plt.ylabel("Number of Successful LLMs")
-    plt.title("Number of Successful LLMs per Stack")
-    plt.xticks(rotation=45, ha='right')
-    plt.tight_layout()
-    stack_success_chart_path = "stack_success_chart.png"
-    plt.savefig(stack_success_chart_path)
-    plt.close()
-    report_content += f"![Stack Success Chart]({stack_success_chart_path})\n\n"
-
-
-    # LLM Success Rate Bar Chart
-    llm_names = [item[0] for item in llm_summary_data]
-    llm_success_values = [item[1] for item in llm_summary_data]
-
-    plt.figure(figsize=(10, 6))
-    plt.bar(llm_names, llm_success_values, color='lightcoral')
-    plt.xlabel("LLM")
-    plt.ylabel("Number of Successful Stacks")
-    plt.title("Number of Successful Stacks per LLM")
-    plt.xticks(rotation=45, ha='right')
-    plt.tight_layout()
-    llm_success_chart_path = "llm_success_chart.png"
-    plt.savefig(llm_success_chart_path)
-    plt.close()
-    report_content += f"![LLM Success Chart]({llm_success_chart_path})\n\n"
-
-
     # --- Write Report to File ---
     try:
         with open(REPORT_FILE, "w", encoding="utf-8") as report_file:
