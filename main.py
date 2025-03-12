@@ -197,7 +197,7 @@ def get_tools(directory: str):
         Returns:
             Dictionary with success status and list of file names.
         """
-        files = [os.path.relpath(os.path.join(root, f), directory) 
+        files = [os.path.relpath(os.path.join(root, f), directory)
                     for root, _, fs in os.walk(directory) for f in fs]
         return files
 
@@ -279,7 +279,37 @@ def get_tools(directory: str):
             print(f"Error deleting file {filename}: {e}")
             return False
 
-    return [list_files, read_file, write_file, append_file, delete_file]
+    @tool
+    def run_shell_command(command: str) -> str:
+        """
+        Execute a shell command on Windows and return the output.
+
+        Args:
+            command: The shell command to execute.
+
+        Returns:
+            The output of the command.
+        """
+        try:
+            process = subprocess.Popen(
+                command,
+                shell=True,
+                executable="powershell.exe", # Explicitly use PowerShell on Windows
+                cwd=directory,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace"
+            )
+            stdout, stderr = process.communicate()
+            if stderr:
+                return f"Error:\n{stderr}"
+            return stdout
+        except Exception as e:
+            return f"Error executing command: {e}"
+
+    return [list_files, read_file, write_file, append_file, delete_file, run_shell_command]
 
 # Checkpoint management
 def save_checkpoint(results: List[Dict[str, Any]]):
