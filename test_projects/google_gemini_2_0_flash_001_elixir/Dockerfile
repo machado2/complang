@@ -1,43 +1,65 @@
 
-FROM elixir:1.14-otp-26 AS builder
+FROM elixir:1.15-otp-26 AS builder
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends     postgresql-client
+# Install build dependencies
+RUN apt-get update -y
+RUN apt-get install -y build-essential postgresql-client libpq-dev git
 
-# Install hex and rebar
+# Install Hex and Rebar
 RUN mix local.hex --force
 RUN mix local.rebar --force
 
-# Copy project files
-COPY mix.exs .
-COPY mix.lock .
+# Create Phoenix project
+RUN mix phx.new --no-ecto --no-assets . --force --app complang
 
-# Get deps
-RUN mix deps.get
-RUN mix deps.compile
-
-COPY config config
+# Copy project source
 COPY lib lib
+COPY config config
 COPY priv priv
 
-# Compile the project
+#Copy router
+COPY lib/complang_web/router.ex lib/complang_web/router.ex
+COPY lib/complang_web/controllers/user_controller.ex lib/complang_web/controllers/user_controller.ex
+COPY config/dev.exs config/dev.exs
+#ENV
+ENV SECRET_KEY_BASE="test"
+ENV CASSANDRA_HOST=host.docker.internal
+ENV CASSANDRA_PORT=9042
+ENV PGPASSWORD=Saloon5-Moody-Observing
+
+# Get dependencies
+RUN mix deps.get
+
+
+# Compile the application
+RUN mix assets.deploy
 RUN mix compile
 
-# Release
+# Build release
 RUN mix release
 
-FROM alpine:3.18 AS release
+# Release stage
+FROM debian:stable-slim
 
 WORKDIR /app
 
-RUN apk update && apk add --no-cache libstdc++ postgresql-client
+# Install runtime dependencies
+RUN apt-get update -y
+RUN apt-get install -y libstdc++ openssl postgresql-client
 
-# Copy the release from the builder stage
+# Copy release from builder
 COPY --from=builder /app/_build/prod/rel/complang ./
 
-# Set the port
-EXPOSE 8080
+# Set environment variables
+ENV PORT=8080
+ENV SECRET_KEY_BASE="test"
+ENV CASSANDRA_HOST=host.docker.internal
+ENV CASSANDRA_PORT=9042
+ENV PGPASSWORD=Saloon5-Moody-Observing
 
-# Run the application
-CMD ["/app/bin/complang", "start"]
+# Set port through the command line for vmargs
+CMD ["bin/complang", "start"]
+
+EXPOSE 8080

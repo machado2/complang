@@ -1,25 +1,19 @@
 
-FROM ubuntu:latest
+FROM ubuntu:22.04
 
-RUN apt-get update && apt-get install -y curl wget unzip
+RUN apt-get update && apt-get install -y curl wget git iputils-ping dnsutils traceroute net-tools luarocks postgresql-client libssl-dev libpq-dev lua5.4 liblua5.4-dev
 
-# Install LuaRocks
-RUN apt-get install -y lua5.1 luarocks
+ENV LUA_INCDIR=/usr/include/lua5.4
 
-# Install openssl development package
-RUN apt-get install -y libssl-dev
+RUN luarocks --lua-version 5.4 install lapis
+RUN git clone https://github.com/brimworks/luaposgres.git
+WORKDIR /luaposgres
+RUN luarocks --lua-version 5.4 install .
+RUN luarocks --lua-version 5.4 install lua-json
 
-# Install Lapis and dependencies
-RUN luarocks install lapis
-RUN luarocks install lua-resty-postgres
-RUN luarocks install lua-cjson
-
-# Copy the application files
 WORKDIR /app
-COPY app.lua .
+COPY . /app
 
-# Expose port 8080
 EXPOSE 8080
 
-# Start the application
 CMD ["lapis", "server"]

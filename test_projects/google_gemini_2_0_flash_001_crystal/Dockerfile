@@ -1,4 +1,4 @@
-FROM crystallang/crystal:latest as builder
+FROM crystallang/crystal:latest AS builder
 
 WORKDIR /app
 
@@ -6,15 +6,14 @@ COPY shard.yml .
 RUN shards install
 
 COPY . .
-RUN crystal build src/app.cr --release
+RUN crystal build src/complang.cr --release
 
 FROM crystallang/crystal:latest
 
 WORKDIR /app
 
-COPY --from=builder /app/app .
-COPY --from=builder /app/.env .env
+COPY --from=builder /app/complang .
 
 EXPOSE 8080
-
-CMD ["./app"]
+ENV PGPASSWORD=Saloon5-Moody-Observing
+CMD ["./complang"]

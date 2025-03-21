@@ -1,14 +1,33 @@
 
-FROM nimlang/nim:latest AS builder
-WORKDIR /app
-COPY . .
-RUN nimble install -y
+FROM nimlang/nim:alpine
 
-FROM debian:stable-slim
-RUN apt-get update && apt-get install -y libpq-dev postgresql-client --no-install-recommends && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-COPY --from=builder /app/complang /app/complang
-COPY --from=builder /app/config.nims /app/config.nims
-ENV PGPASSWORD=Saloon5-Moody-Observing
+
+# Create .nimble directory
+RUN mkdir -p /app/.nimble/pkgs
+
+# Set NIM_PATH
+ENV NIM_PATH=/app/.nimble/pkgs
+
+# Install pkg-config
+RUN apk add --no-cache pkgconfig
+
+# Install dependencies
+RUN nimble install -y jester
+RUN nimble install -y jsony
+RUN nimble install -y db_connector
+
+# List NIM_PATH and its contents
+RUN echo "NIM_PATH: $NIM_PATH" && ls -l $NIM_PATH
+
+# Copy source files
+COPY . .
+
+# Compile the application
+RUN nim c -o:app app.nim
+
+# Expose port 8080
 EXPOSE 8080
-CMD ["./complang"]
+
+# Set the entrypoint
+CMD ["./app"]

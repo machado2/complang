@@ -1,8 +1,0 @@
-
-package crud-api
-
-modules = Main, Database, Models, Api
-sourcedir = src
-executable = crud-api
-main = Main
-pkgs = contrib, network, postgresql

@@ -1,17 +1,19 @@
-name: crud-api
+name: complang
 version: 0.1.0
 
 authors:
-  - Your Name
+  - Your Name <your_email@example.com>
 
-crystal: '>= 1.0.0'
+targets:
+  complang:
+    main: src/complang.cr
 
-license: MIT
+crystal: ">= 1.0.0"
 
 dependencies:
   kemal:
     github: kemalcr/kemal
   pg:
     github: will/crystal-pg
-  clear_env:
-    github: arctic-fox/clear_env
+
+license: MIT

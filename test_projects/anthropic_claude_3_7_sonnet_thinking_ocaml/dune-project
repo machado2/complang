@@ -1,9 +1,0 @@
-(lang dune 2.9)
-(name ocaml_crud_api)
-(package
- (name ocaml_crud_api)
- (synopsis "CRUD API in OCaml")
- (description "A simple CRUD API for user management with PostgreSQL")
- (depends
-  (dune (>= 2.9))
-  (opam-version (>= 2.0))))

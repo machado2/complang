@@ -1,7 +1,0 @@
-name "complang_api"
-version "0.1.0"
-description "A CRUD API in D using vibe.d with PostgreSQL"
-authors "Assistant"
-dependency "vibe-d" version="~0.9.4"
-targetType "executable"
-mainSourceFile "main.d"

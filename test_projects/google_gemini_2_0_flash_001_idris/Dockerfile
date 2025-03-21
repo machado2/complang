@@ -1,36 +1,46 @@
+
 FROM ubuntu:latest
 
-# Install dependencies
 RUN apt-get update && apt-get install -y \
-    wget \
-    tar \
-    make \
-    gcc \
-    g++ \
-    libpq-dev \
-    postgresql-client
+    software-properties-common \
+    curl \
+    gnupg \
+    zlib1g-dev
 
-# Download and install Idris2
-RUN wget https://github.com/idris-lang/Idris2/releases/download/v0.6.0/idris2-0.6.0-linux.tar.gz
-RUN tar -xzf idris2-0.6.0-linux.tar.gz
-RUN mv idris2-0.6.0 /opt/idris2
-RUN ln -s /opt/idris2/idris2 /usr/local/bin/idris2
-RUN ln -s /opt/idris2/lib /usr/local/lib/idris2
+# Install build dependencies - cabal-install, then set up a local cabal environment.
+RUN apt-get update && apt-get install -y git make libgmp-dev cabal-install
 
-# Set environment variables
-ENV IDRIS2_HOME /opt/idris2
-ENV PATH "$PATH:/opt/idris2"
+# Set up a local Cabal environment
+RUN mkdir /opt/cabal
+ENV CABAL_DIR=/opt/cabal
+ENV PATH="/opt/cabal/bin:${PATH}"
+
+RUN cabal update
+RUN cabal install cabal-install --install-method=copy --prefix=/opt/cabal
+
+# Install idris-db dependencies - required before building Idris
+RUN apt-get install -y libpq-dev
+
+# Install Idris directly from source
+
+RUN git clone https://github.com/idris-lang/Idris-dev.git /tmp/idris-dev
+WORKDIR /tmp/idris-dev
+
+# Install cabal dependencies required by Idris
+RUN /opt/cabal/bin/cabal install --only-dependencies -j1 --disable-tests
+
+RUN make install
+
+# Install idris-db
+RUN /opt/cabal/bin/cabal install idris-db --disable-tests
 
 WORKDIR /app
 
-# Copy project files
-COPY . .
+COPY complang-api.ipkg .
+COPY Main.idr .
 
-# Build the project
-RUN idris2 --build main.ipkg
+RUN /opt/cabal/bin/idris --build complang-api.ipkg
 
-# Expose port
 EXPOSE 8080
 
-# Run the application
-CMD ["./main"]
+CMD ["./complang-api"]

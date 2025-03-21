@@ -22,7 +22,7 @@ from generate_report import generate_report
 # LLMS = ["openai/o3-mini-high", "openai/gpt-4o-mini", "google/gemini-2.0-flash-001", "meta-llama/llama-3.3-70b-instruct", "google/gemini-2.0-pro-exp-02-05:free", "google/gemini-2.0-flash-thinking-exp:free"]]
 # STACKS = ["Python", "Java", "JavaScript", "C++", "C#", "PHP", "Rust", "TypeScript", "Go", "Kotlin", "Ruby", "Scala", "Haskell", "Perl", "Raku", "Clojure", "Common Lisp", "OCAML", "D lang", "Elixir", "Idris"]
 
-LLMS = ["openai/o3-mini-high", "anthropic/claude-3.7-sonnet:thinking", "google/gemini-2.0-flash-001"]
+LLMS = ["google/gemini-2.0-flash-001"]
 STACKS = ["Python", "Java", "JavaScript", "C++", "C#", "PHP", "Rust", "TypeScript", "Go", "Kotlin", "Ruby", "Scala", "Haskell", "Perl", "Raku", "Clojure", "Common Lisp", "OCAML", "D lang", "Elixir", "Idris", "Lua", "Crystal", "Nim"]
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -30,8 +30,8 @@ DBNAME = "complang"
 DBUSER = "testuser"
 DBPASSWORD = "Saloon5-Moody-Observing"
 BASE_DIR = "./test_projects"
-MAX_STEPS = 3
-MAX_ATTEMPTS = 3
+MAX_STEPS = 30
+MAX_ATTEMPTS = 10
 BASE_PORT = 8080
 CHECKPOINT_FILE = "./checkpoint.json"
 REPORT_FILE = "test_report.md"

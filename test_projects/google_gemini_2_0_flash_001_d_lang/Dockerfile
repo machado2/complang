@@ -1,34 +1,29 @@
-
 FROM ubuntu:latest
 
-# Update package lists
-RUN apt-get update
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    unzip \
+    wget \
+    software-properties-common \
+    tzdata \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install necessary packages
-RUN apt-get install -y curl wget unzip
-RUN apt-get install -y libpq-dev
+# Install D compiler (DMD) - Following official instructions
+RUN apt-get update && apt-get install -y --no-install-recommends ldc dub
 
-# Install D compiler (dmd) - Correct the package name here
-RUN apt-get install -y ldc
+ENV TERM=xterm
+
+WORKDIR /app
+RUN dub init
 
 # Install vibe.d
-RUN curl -fsS https://dlang.org/install.sh | sh -sf -d /usr/local -v
+RUN dub add vibe-http:>=0.9
 
-# Set environment variables
-ENV PGPASSWORD=${PGPASSWORD}
-ENV APP_PORT=8080
+COPY app.d .
 
-# Create app directory
-WORKDIR /app
+RUN dub build
 
-# Copy application source code
-COPY . .
+EXPOSE 8080
 
-# Build the application
-RUN dmd -O -release src/app.d -L-lpostgres -L-lpq
-
-# Expose the port
-EXPOSE $APP_PORT
-
-# Command to run the application
 CMD ["./app"]

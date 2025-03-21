@@ -1,0 +1,6 @@
+
+package complang-api
+
+modules = Main
+
+depends = base, contrib, elerea, idris-db

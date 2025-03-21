@@ -1,8 +1,0 @@
-
-package myapp
-
-modules = Main
-
-main = Main
-
-depends = contrib, network, postgresql

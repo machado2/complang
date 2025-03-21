@@ -1,197 +1,170 @@
+
 module Main
 
+import Elerea
+import Elerea.Routing
+import Elerea.JSON
+import Elerea.HTTP
+import Elerea.Form
+import Data.Either
 import Data.String
-import Data.List
-import Data.Maybe
+import Data.Integer
 import System
-import System.Environment
-import TCP
 import Network.Socket
-import Palmer.HTTP
-import Palmer.HTTP.Types
-import Palmer.HTTP.Router
-import Palmer.HTTP.Server
-import Palmer.HTTP.Response
-import Palmer.JSON
-import Palmer.JSON.Decode
-import Palmer.JSON.Encode
 import Database.PostgreSQL
+import Data.Maybe
 
-%default total
+%language Elerea
 
--- Data Models
-record User where
-  constructor MkUser
-  id    : Int
-  name  : String
+-- User Definition
+data User = User (id : Integer) (name : String) (email : String)
+
+record UserInput where
+  constructor MkUserInput
+  name : String
   email : String
 
--- JSON Instances
-JSONValue User where
-  toJSON (MkUser id name email) =
-    JObject [ ("id",    toJSON id)
-            , ("name",  toJSON name)
-            , ("email", toJSON email) ]
+toUser : Integer -> UserInput -> User
+toUser id (MkUserInput name email) = User id name email
 
--- Decode the JSON
-fromJSON : JSONValue -> Maybe User
-fromJSON (JObject obj) = do
-  id    <- fromJSON =<< lookup "id"    obj
-  name  <- fromJSON =<< lookup "name"  obj
-  email <- fromJSON =<< lookup "email" obj
-  pure $ MkUser id name email
-fromJSON _ = Nothing
+fromValue : Value -> Either String UserInput
+fromValue (Object obj) =
+  case lookup "name" obj of
+    Nothing => Left "Missing name field"
+    Just (String name) =>
+      case lookup "email" obj of
+        Nothing => Left "Missing email field"
+        Just (String email) => Right (MkUserInput name email)
+        Just _ => Left "Invalid email field"
+    Just _ => Left "Invalid name field"
+FromValue _ = Left "Invalid UserInput format"
 
--- Database Configuration
-dbHost     : String
-dbHost     = "host.docker.internal"
 
-dbPort     : String
-dbPort     = "5432"
+-- JSON instances
+Show User where
+  show (User id name email) =
+    "{\\"id\\":" ++ show id ++ ", \\"name\\":\\"" ++ name ++ "\\", \\"email\\":\\"" ++ email ++ "\\"}";
 
-dbName     : String
-dbName     = "complang"
+-- Database Interaction
+getPort : IO Integer
+getPort = do env <- getEnv "PORT"
+             case env of
+               Nothing => pure 8080
+               Just p => case parseInteger p of
+                            Nothing => pure 8080
+                            Just i => pure i
 
-dbUser     : String
-dbUser     = "testuser"
+dbConnectionString : IO String
+dbConnectionString = do
+  pw <- getEnv "PGPASSWORD"
+  case pw of
+    Nothing => pure "host=host.docker.internal port=5432 dbname=complang user=testuser password=Saloon5-Moody-Observing"
+    Just password => pure $ "host=host.docker.internal port=5432 dbname=complang user=testuser password=" ++ password
 
--- NOTE: password needs to be set in the env variable PGPASSWORD
--- dbPassword : String
--- dbPassword = "Saloon5-Moody-Observing"
+-- | Execute a database query.  We use the bracket pattern to ensure
+--   that the connection is closed even in case of errors.
+withConnection : (Connection -> IO a) -> IO a
+withConnection action = do
+  connStr <- dbConnectionString
+  bracket (connectPostgreSQL connStr) close action
 
--- Helper function to get the password from the environment
-getDbPassword : IO String
-getDbPassword = getEnv "PGPASSWORD" `catch` \(me : IOError) => pure ""
+createUser : String -> String -> IO String  -- name, email
+createUser name email = withConnection $ \conn => do
+  result <- query conn ("INSERT INTO users (name, email) VALUES ('" ++ name ++ "', '" ++ email ++ "') RETURNING id, name, email;") []
+  case result of
+    Left err => pure $ "Error: " ++ show err
+    Right rows =>
+      case flattenRows rows of
+        [ [ PGInteger id, PGText name, PGText email ] ] =>
+          pure $ "{\"id\":" ++ show id ++ ", \"name\":\"" ++ name ++ "\", \"email\":\"" ++ email ++ "\"}";
+        _ => pure "Error: Unexpected result from database"
 
--- Database connection string
-getConnectionString : String -> String
-getConnectionString password =
-  "host=" ++ dbHost ++ " port=" ++ dbPort ++ " dbname=" ++ dbName ++ " user=" ++ dbUser ++ " password=" ++ password
+getUsers : IO String
+getUsers = withConnection $ \conn => do
+  result <- query conn "SELECT id, name, email FROM users;" []
+  case result of
+    Left err => pure $ "Error: " ++ show err
+    Right rows =>
+      let
+        users = map (\row =>
+          case flattenRows [row] of
+            [ PGInteger id, PGText name, PGText email ] =>
+              "{\"id\":" ++ show id ++ ", \"name\":\"" ++ name ++ "\", \"email\":\"" ++ email ++ "\"}";
+            _ => "{}"
+          ) rows
+      in pure $ "[" ++ concatWith ", " users ++ "]"
 
--- Handler to get all users
-getAllUsers : IO Response
-getAllUsers = do
-  password <- getDbPassword
-  conn <- connectDB (getConnectionString password)
-  case conn of
-       Left err => pure $ jsonResponse 500 $ JObject [("error", JString $ pack $ show err)]
-       Right c => do
-         result <- query c "SELECT id, name, email FROM users" []
-         close c
-         case result of
-              Left err => pure $ jsonResponse 500 $ JObject [("error", JString $ pack $ show err)]
-              Right qr =>
-                let
-                  users : List User
-                  users = mapMaybe (\row =>
-                                      case row of
-                                           [PGInt id, PGText name, PGText email] =>
-                                             Just $ MkUser (cast id) (cast name) (cast email)
-                                           _ => Nothing
-                                  ) (qrRows qr)
-                in
-                  pure $ jsonResponse 200 $ toJSON users
+getUser : String -> IO String -- id
+getUser userId = withConnection $ \conn => do
+  result <- query conn ("SELECT id, name, email FROM users WHERE id = " ++ userId ++ ";") []
+  case result of
+    Left err => pure $ "Error: " ++ show err
+    Right rows =>
+      case flattenRows =<< rows of
+        [ PGInteger id, PGText name, PGText email ] =>
+          pure $ "{\"id\":" ++ show id ++ ", \"name\":\"" ++ name ++ "\", \"email\":\"" ++ email ++ "\"}";
+        _ => pure $ response "Not Found" 404 --"Error: User not found"
+updateUser : String -> String -> String -> IO String  -- id, name, email
+updateUser userId name email = withConnection $ \conn => do
+  result <- query conn ("UPDATE users SET name = '" ++ name ++ "', email = '" ++ email ++ "' WHERE id = " ++ userId ++ ";") []
+  case result of
+    Left err => pure $ "Error: " ++ show err
+    Right _ => pure "" -- Successfully updated
 
--- Handler to create a new user
-createUser : Request -> IO Response
-createUser req = do
-  password <- getDbPassword
-  conn <- connectDB (getConnectionString password)
-  case conn of
-       Left err => pure $ jsonResponse 500 $ JObject [("error", JString $ pack $ show err)]
-       Right c => do
-          body <- getBody req
-          case decodeJSON body of
-               Nothing => pure $ textResponse 400 "Invalid JSON"
-               Just json =>
-                 case fromJSON json of
-                      Nothing => pure $ textResponse 400 "Invalid User data"
-                      Just (MkUser _ name email) => do
-                        result <- query c "INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id, name, email" [PGText name, PGText email]
-                        close c
-                        case result of
-                             Left err => pure $ jsonResponse 500 $ JObject [("error", JString $ pack $ show err)]
-                             Right qr =>
-                                case qrRows qr of
-                                     [[PGInt id, PGText name', PGText email']] =>
-                                         let newUser = MkUser (cast id) (cast name') (cast email') in
-                                         pure $ jsonResponse 201 $ toJSON newUser
-                                     _ => pure $ textResponse 500 "Failed to create user"
+deleteUser : String -> IO String -- id
+deleteUser userId = withConnection $ \conn => do
+  result <- query conn ("DELETE FROM users WHERE id = " ++ userId ++ ";") []
+  case result of
+    Left err => pure $ "Error: " ++ show err
+    Right _ => pure "" -- Successfully deleted
 
--- Handler to get a user by ID
-getUserById : String -> IO Response
-getUserById userId = do
-  password <- getDbPassword
-  conn <- connectDB (getConnectionString password)
-  case conn of
-       Left err => pure $ jsonResponse 500 $ JObject [("error", JString $ pack $ show err)]
-       Right c => do
-         result <- query c "SELECT id, name, email FROM users WHERE id = $1" [PGInt $ cast $ parseInteger userId]
-         close c
-         case result of
-              Left err => pure $ jsonResponse 500 $ JObject [("error", JString $ pack $ show err)]
-              Right qr =>
-                case qrRows qr of
-                     [] => pure $ textResponse 404 "User not found"
-                     [[PGInt id, PGText name, PGText email]] =>
-                         let user = MkUser (cast id) (cast name) (cast email) in
-                         pure $ jsonResponse 200 $ toJSON user
-                     _ => pure $ textResponse 500 "Internal Server Error"
+concatWith : String -> List String -> String
+concatWith sep [] = ""
+concatWith sep [x] = x
+concatWith sep (x :: xs) = x ++ sep ++ concatWith sep xs
 
--- Handler to update a user
-updateUser : String -> Request -> IO Response
-updateUser userId req = do
-  password <- getDbPassword
-  conn <- connectDB (getConnectionString password)
-  case conn of
-       Left err => pure $ jsonResponse 500 $ JObject [("error", JString $ pack $ show err)]
-       Right c => do
-          body <- getBody req
-          case decodeJSON body of
-               Nothing => pure $ textResponse 400 "Invalid JSON"
-               Just json =>
-                 case fromJSON json of
-                      Nothing => pure $ textResponse 400 "Invalid User data"
-                      Just (MkUser _ name email) => do
-                        result <- query c "UPDATE users SET name = $1, email = $2 WHERE id = $3" [PGText name, PGText email, PGInt $ cast $ parseInteger userId]
-                        close c
-                        case result of
-                             Left err => pure $ jsonResponse 500 $ JObject [("error", JString $ pack $ show err)]
-                             Right qr =>
-                               if affectedRows qr > 0
-                               then pure $ textResponse 204 ""
-                               else pure $ textResponse 404 "User not found"
+response : String -> Integer -> String
+response body status = "HTTP/1.1 " ++ show status ++ " OK\nContent-Type: application/json\n\n" ++ body
 
--- Handler to delete a user
-deleteUser : String -> IO Response
-deleteUser userId = do
-  password <- getDbPassword
-  conn <- connectDB (getConnectionString password)
-  case conn of
-       Left err => pure $ jsonResponse 500 $ JObject [("error", JString $ pack $ show err)]
-       Right c => do
-         result <- query c "DELETE FROM users WHERE id = $1" [PGInt $ cast $ parseInteger userId]
-         close c
-         case result of
-              Left err => pure $ jsonResponse 500 $ JObject [("error", JString $ pack $ show err)]
-              Right qr =>
-                if affectedRows qr > 0
-                then pure $ textResponse 204 ""
-                else pure $ textResponse 404 "User not found"
-
--- Routing
-router : Router IO
-router = createRouter
-  [ Route GET "/users" getAllUsers
-  , Route POST "/users" createUser
-  , Route GET "/users/:id" (\req, params => maybe (pure $ textResponse 400 "Invalid ID") getUserById (lookup "id" params))
-  , Route PUT "/users/:id" (\req, params => maybe (pure $ textResponse 400 "Invalid ID") (\id => updateUser id req) (lookup "id" params))
-  , Route DELETE "/users/:id" (\req, params => maybe (pure $ textResponse 400 "Invalid ID") deleteUser (lookup "id" params))
+-- Routing Table
+routes : List Route
+routes =
+  [ Route GET "/users" (eq => do res <- getUsers; pure (response res 200))
+  , Route POST "/users" (eq => do
+      case req ^. requestBody of
+        Nothing => pure (response "Missing body" 400)
+        Just body => case fromValue body of
+          Left err => pure (response err 400)
+          Right userInput => do
+            res <- createUser (userInput.name) (userInput.email)
+            pure (response res 201)
+    )
+  , Route GET "/users/:id" (eq => do
+      let userId = param "id" req
+      res <- getUser userId
+      if res == response "Not Found" 404 then
+          pure (response "User not found" 404)
+      else
+          pure (response res 200))
+  , Route PUT "/users/:id" (eq => do
+      let userId = param "id" req
+      case req ^. requestBody of
+        Nothing => pure (response "Missing body" 400)
+        Just body => case fromValue body of
+          Left err => pure (response err 400)
+          Right userInput => do
+            res <- updateUser userId (userInput.name) (userInput.email)
+            pure (response "" 204)
+    )
+  , Route DELETE "/users/:id" (eq => do
+      let userId = param "id" req
+      res <- deleteUser userId;
+      pure (response "" 204))
   ]
 
--- Main function
+
 main : IO ()
 main = do
-  putStrLn "Starting server on port 8080..."
-  startServer router 8080
-
+  port <- getPort
+  putStrLn $ "Starting server on port " ++ show port
+  startServer routes port

@@ -1,3 +1,0 @@
-(executable
- (name main)
- (libraries yojson dream lwt logs logs.fmt fmt caqti caqti-lwt caqti-driver-postgresql uri))

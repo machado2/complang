@@ -1,23 +1,21 @@
+FROM ocaml/opam:debian-11-ocaml-4.14
 
-FROM ocaml/opam:ubuntu-22.04
+RUN sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+RUN opam install dune
 
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update -y && apt-get install -y --no-install-recommends postgresql-client libpq-dev
+RUN opam pin add complang ./complang.opam # Add the current directory as a package source
 
-# Copy project files
 COPY . .
 
-# Install OCaml dependencies
-RUN opam update
-RUN opam install --yes --deps-only .
+RUN opam install --yes --deps-only ./ # Install dependencies
+RUN opam install --yes complang.opam # Install the package itself
 
-# Build the application
-RUN eval $(opam env) && dune build ./bin/main.exe
+ENV LANG=C.UTF-8
 
-# Expose port
+RUN eval $(opam env) && dune build ./src/main.exe
+
 EXPOSE 8080
 
-# Run the application
-CMD ["dune" "exec" "./bin/main.exe"]
+CMD ["dune", "exec", "./src/main.exe"]
